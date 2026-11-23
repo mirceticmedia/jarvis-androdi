@@ -8,174 +8,233 @@
   @font-face{font-family:Orbitron;src:url(fonts/Orbitron.ttf)}
   @font-face{font-family:Rajdhani;src:url(fonts/Rajdhani-SemiBold.ttf);font-weight:600}
   @font-face{font-family:Mono;src:url(fonts/ShareTechMono-Regular.ttf)}
-  :root{--bg:#050f18;--cy:#00c8ff;--cy2:#7fe3ff;--cyd:rgba(0,200,255,.55);--cyl:rgba(0,200,255,.22);--or:#ff9128;--red:#ff3b3b;--wh:#e8f6ff}
+  :root{--cy:#1ec8ff;--cy2:#8fe6ff;--cyd:rgba(30,200,255,.55);--cyl:rgba(30,200,255,.2);--or:#ff9128;--red:#ff3a3a;--wh:#e6f7ff}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
-  html,body{margin:0;height:100%;background:var(--bg);color:var(--wh);font-family:Rajdhani,sans-serif;font-weight:600;overflow:hidden}
-  body{background:
-      radial-gradient(ellipse at 50% 45%,rgba(0,150,230,.20),transparent 60%),
-      linear-gradient(rgba(0,200,255,.05) 1px,transparent 1px) 0 0/34px 34px,
-      linear-gradient(90deg,rgba(0,200,255,.05) 1px,transparent 1px) 0 0/34px 34px,var(--bg)}
-  .frame{position:fixed;inset:6px;pointer-events:none;z-index:0}
-  .frame i{position:absolute;width:30px;height:30px;border:2px solid var(--cyd)}
-  .frame .a{left:0;top:0;border-right:0;border-bottom:0}.frame .b{right:0;top:0;border-left:0;border-bottom:0}
-  .frame .c{left:0;bottom:0;border-right:0;border-top:0}.frame .d{right:0;bottom:0;border-left:0;border-top:0}
-  .frame .l,.frame .r{width:3px;height:64px;border:0;background:var(--or);top:44%;opacity:.8}.frame .l{left:-2px}.frame .r{right:-2px}
-  .home{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;padding:14px 16px 12px}
-
-  .meta{display:flex;justify-content:space-between;font-family:Mono;font-size:9px;letter-spacing:.14em;color:var(--cyd)}
-  .meta b{display:block;font-family:Rajdhani;font-size:13px;color:var(--cy);letter-spacing:.06em}
-  .meta div:last-child{text-align:right}
-  .title{text-align:center;font-family:Orbitron;font-size:21px;letter-spacing:.16em;margin-top:4px;text-shadow:0 0 14px rgba(0,200,255,.45)}
-  .bar{width:34px;height:3px;background:var(--or);margin:4px auto 5px}
-  .cam{text-align:center;font-family:Mono;font-size:9.5px;letter-spacing:.11em;color:var(--cyd);border-bottom:1px solid var(--cyl);padding-bottom:6px;white-space:nowrap;overflow:hidden}
-
-  /* clock + batteries */
-  .top{display:flex;gap:12px;align-items:center;margin-top:10px}
-  .clock{position:relative;width:42vw;max-width:180px;aspect-ratio:1;flex-shrink:0}
-  .clock svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
-  .clock .t{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-  .clock .hm{font-family:Orbitron;font-size:min(8vw,34px);letter-spacing:.02em;text-shadow:0 0 12px rgba(0,200,255,.5)}
-  .clock .sec{font-family:Mono;font-size:12px;color:var(--or);margin-top:-2px}
-  .clock .day{font-size:13px;letter-spacing:.12em;color:var(--cy);margin-top:3px}
-  .clock .date{font-family:Mono;font-size:10px;color:var(--cyd)}
-  .stats{flex:1;min-width:0}
-  .stat{margin-bottom:9px}
-  .stat .row{display:flex;justify-content:space-between;align-items:baseline}
-  .stat .k{font-family:Mono;font-size:9px;letter-spacing:.14em;color:var(--cyd)}
-  .stat .v{font-family:Orbitron;font-size:16px}
-  .stat .track{height:4px;background:rgba(0,200,255,.14);margin-top:3px}
-  .stat .track i{display:block;height:100%;width:0;background:var(--cy);transition:width .6s}
-  .stat.low .track i{background:var(--or)} .stat.low .v{color:#ffc98c}
-
-  /* hologram: tap to talk */
-  .core{position:relative;width:min(64vw,290px);aspect-ratio:1;margin:4px auto 0;flex-shrink:0}
-  .core svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
-  .spin{transform-origin:50% 50%;animation:spin 40s linear infinite}.spin2{transform-origin:50% 50%;animation:spin 22s linear infinite reverse}
-  .spin3{transform-origin:50% 50%;animation:spin 70s linear infinite}
+  html,body{margin:0;height:100%;background:#000;color:var(--wh);font-family:Rajdhani,sans-serif;font-weight:600;overflow:hidden}
+  body{background:radial-gradient(ellipse at 55% 62%,rgba(0,110,190,.28),transparent 58%),radial-gradient(ellipse at 50% 0%,rgba(0,90,160,.25),transparent 40%),#000}
+  /* the whole HUD is drawn on a 400 x 820 stage, scaled to the phone */
+  #stage{position:absolute;left:50%;top:50%;width:400px;height:820px;transform-origin:50% 50%}
+  #deco{position:absolute;inset:0;width:400px;height:820px;overflow:visible}
+  .spin{animation:spin 60s linear infinite}
+  .spinr{animation:spin 34s linear infinite reverse}
+  .spinf{animation:spin 14s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
-  .holo{position:absolute;left:50%;top:48%;width:70%;aspect-ratio:1;transform:translate(-50%,-50%);background:url(cam.webp) 0 0/1000% 600% no-repeat;filter:drop-shadow(0 0 10px rgba(0,190,255,.55))}
-  .glow{position:absolute;left:50%;top:50%;width:58%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(0,150,255,.30),rgba(0,90,160,.08) 55%,transparent 70%)}
-  .talk{position:absolute;left:0;right:0;bottom:15%;text-align:center;font-family:Orbitron;font-size:9px;letter-spacing:.3em;color:var(--cy2)}
-  .core:active .holo{filter:drop-shadow(0 0 14px rgba(255,145,40,.8)) hue-rotate(160deg) saturate(1.6)}
-  .jst{text-align:center;font-family:Orbitron;font-size:9px;letter-spacing:.2em;color:var(--cy);margin-top:-6px}
-  .jst b{font-weight:400;color:#3dffa8}.jst b.off{color:var(--red)}
-
-  /* shortcuts */
-  .sh{position:relative;font-family:Orbitron;font-size:11px;letter-spacing:.2em;color:var(--cy);padding-bottom:5px;border-bottom:1px solid var(--cyl);margin:10px 0 8px}
-  .sh:before{content:"";position:absolute;left:0;bottom:-3px;width:30px;height:3px;background:var(--or)}
-  .sh:after{content:"";position:absolute;right:0;bottom:-3px;width:5px;height:5px;background:var(--cy)}
-  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-  .app{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 2px 6px;border:1px solid var(--cyl);
-    background:linear-gradient(180deg,rgba(0,110,160,.22),rgba(0,60,95,.08));position:relative;min-width:0}
-  .app:after{content:"";position:absolute;left:-1px;bottom:-1px;width:10px;height:2px;background:var(--or)}
-  .app img{width:40px;height:40px;filter:drop-shadow(0 0 6px rgba(0,190,255,.35))}
-  .app .ph{width:40px;height:40px;border:1px dashed var(--cyl)}
-  .app span{font-size:11px;letter-spacing:.04em;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 3px}
-  .app:active{background:rgba(0,200,255,.28)}
-  .spacer{flex:1}
-
-  .dock{display:flex;gap:8px;margin-top:10px}
-  .dock button{flex:1;padding:12px 4px;border:1px solid var(--cyd);background:rgba(0,110,160,.2);color:var(--wh);font-family:Orbitron;font-size:10px;letter-spacing:.16em}
-  .dock button.j{border-color:var(--or);color:#ffd2a0;background:rgba(255,145,40,.12)}
-  .dock button.s{flex:0 0 52px}
-  .dock button:active{background:rgba(0,200,255,.35)}
+  .t{position:absolute;white-space:nowrap}
+  .orb{font-family:Orbitron}
+  .mono{font-family:Mono}
+  .holo{position:absolute;background:url(cam.webp) 0 0/1000% 600% no-repeat;filter:drop-shadow(0 0 8px rgba(0,190,255,.7));pointer-events:none}
+  .hit{position:absolute;border-radius:50%}
+  .hit:active{background:rgba(30,200,255,.18)}
+  /* right fan: shortcuts */
+  #fan{position:absolute;left:258px;top:378px;width:142px}
+  #fan .it{display:flex;align-items:center;justify-content:flex-end;gap:8px;height:21px;margin-bottom:3px;padding-right:2px;
+    font-size:12.5px;letter-spacing:.05em;color:var(--wh);background:linear-gradient(90deg,transparent,rgba(0,60,100,.55) 40%);border-right:2px solid var(--cyd)}
+  #fan .it span{overflow:hidden;text-overflow:ellipsis;max-width:110px}
+  #fan .it i{width:9px;height:9px;border-radius:50%;background:var(--cy);box-shadow:0 0 6px var(--cy);flex-shrink:0}
+  #fan .it:active{background:rgba(30,200,255,.35)}
+  .bar{position:absolute;height:4px;background:rgba(30,200,255,.15)}
+  .bar i{display:block;height:100%;width:0;background:var(--cy);box-shadow:0 0 6px rgba(30,200,255,.8);transition:width .6s}
+  .bar.low i{background:var(--red)}
+  .dock{position:absolute;width:62px;height:62px;border-radius:50%}
+  .dock:active{background:rgba(30,200,255,.25)}
 
   /* all apps */
-  .drawer{position:fixed;inset:0;z-index:5;background:rgba(3,10,16,.96);display:flex;flex-direction:column;padding:14px 16px;transform:translateY(100%);transition:transform .25s ease}
+  .drawer{position:fixed;inset:0;z-index:5;background:rgba(0,6,12,.97);display:flex;flex-direction:column;padding:14px 16px;transform:translateY(100%);transition:transform .25s ease}
   .drawer.open{transform:none}
   .drawer .top2{display:flex;gap:8px;align-items:center}
   .drawer input{flex:1;background:rgba(0,70,110,.25);border:1px solid var(--cyd);color:var(--wh);font:inherit;font-size:16px;padding:10px;outline:none;border-radius:0}
   .drawer .x{border:1px solid var(--cyd);background:transparent;color:var(--cy);font-family:Orbitron;font-size:11px;padding:11px 12px}
   .drawer .list{flex:1;overflow-y:auto;margin-top:10px}
-  .drawer .grid{grid-template-columns:repeat(4,1fr)}
-
-  .menu{position:fixed;inset:0;z-index:9;display:none;align-items:flex-end;background:rgba(0,0,0,.5)}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .app{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 2px 6px;border:1px solid var(--cyl);background:linear-gradient(180deg,rgba(0,110,160,.22),rgba(0,60,95,.08));position:relative;min-width:0}
+  .app:after{content:"";position:absolute;left:-1px;bottom:-1px;width:10px;height:2px;background:var(--or)}
+  .app img{width:40px;height:40px;filter:drop-shadow(0 0 6px rgba(0,190,255,.35))}
+  .app .ph{width:40px;height:40px;border:1px dashed var(--cyl)}
+  .app span{font-size:11px;letter-spacing:.04em;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 3px}
+  .app:active{background:rgba(30,200,255,.28)}
+  .menu{position:fixed;inset:0;z-index:9;display:none;align-items:flex-end;background:rgba(0,0,0,.55)}
   .menu.open{display:flex}
-  .menu .box{width:100%;background:#071824;border-top:2px solid var(--cy);padding:14px 16px 22px}
+  .menu .box{width:100%;background:#03121c;border-top:2px solid var(--cy);padding:14px 16px 22px}
   .menu .box h3{margin:0 0 10px;font-family:Orbitron;font-size:12px;letter-spacing:.16em;color:var(--cy)}
   .menu .box button{display:block;width:100%;text-align:left;margin-top:6px;padding:12px;border:1px solid var(--cyl);background:rgba(0,110,160,.16);color:var(--wh);font:inherit;font-size:15px}
-  .menu .box button.d{color:#ffb3b3;border-color:rgba(255,59,59,.4)}
+  .menu .box button.d{color:#ffb3b3;border-color:rgba(255,58,58,.4)}
 </style>
 </head>
 <body>
-<div class="frame"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="l"></i><i class="r"></i></div>
+<div id="stage">
+  <svg id="deco" viewBox="0 0 400 820"></svg>
 
-<div class="home" id="home">
-  <div class="meta"><div>OPERATOR<b>MOBILE</b></div><div>HOST / <span id="hostst">OFFLINE</span><b id="host">LAPTOP</b></div></div>
-  <div class="title">MIRCETICMEDIA</div><div class="bar"></div>
-  <div class="cam">STBY / 4K UHD / 25.00P / F2.8 / ISO 400 / 5600K / ND OFF</div>
+  <!-- header -->
+  <div class="t orb" style="left:24px;top:30px;font-size:16.5px;letter-spacing:.14em;text-shadow:0 0 10px rgba(30,200,255,.8)">MIRCETICMEDIA</div>
+  <div class="t mono" style="left:26px;top:54px;font-size:8.5px;letter-spacing:.2em;color:var(--cyd)">4K UHD / F2.8 / ISO 400 / 5600K</div>
+  <div class="t" id="city" style="right:86px;top:22px;font-size:12px;letter-spacing:.06em;text-align:right">BEOGRAD, SRBIJA</div>
+  <div class="t mono" id="cond" style="right:86px;top:38px;font-size:10px;color:var(--cy2);text-align:right">--</div>
+  <div class="t mono" id="dateTop" style="right:86px;top:54px;font-size:9px;color:var(--cyd);text-align:right"></div>
+  <div class="t orb" id="tempTop" style="left:322px;top:47px;width:64px;text-align:center;font-size:16px">--°</div>
+  <div class="t mono" style="left:322px;top:69px;width:64px;text-align:center;font-size:6.5px;color:var(--cyd);letter-spacing:.1em">NAPOLJU</div>
 
-  <div class="top">
-    <div class="clock">
-      <svg viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r="47" fill="none" stroke="rgba(0,200,255,.35)" stroke-width="3" stroke-dasharray="0.6 3.3"/>
-        <circle cx="50" cy="50" r="41" fill="none" stroke="rgba(0,200,255,.12)" stroke-width="4"/>
-        <circle id="arcM" cx="50" cy="50" r="41" fill="none" stroke="#00c8ff" stroke-width="4" stroke-dasharray="0 999"/>
-        <circle id="arcS" cx="50" cy="50" r="35" fill="none" stroke="#ff9128" stroke-width="3" stroke-dasharray="0 999"/>
-        <circle cx="50" cy="50" r="30" fill="rgba(0,150,220,.07)" stroke="rgba(0,200,255,.25)" stroke-width="1"/>
-      </svg>
-      <div class="t"><div class="hm" id="hm">--:--</div><div class="sec" id="sec">00</div><div class="day" id="day"></div><div class="date" id="date"></div></div>
-    </div>
-    <div class="stats">
-      <div class="stat" id="s-phone"><div class="row"><span class="k">TELEFON</span><span class="v">--</span></div><div class="track"><i></i></div></div>
-      <div class="stat" id="s-laptop"><div class="row"><span class="k">LAPTOP</span><span class="v">--</span></div><div class="track"><i></i></div></div>
-      <div class="stat" id="s-hp"><div class="row"><span class="k">SONY</span><span class="v">--</span></div><div class="track"><i></i></div></div>
-      <div class="stat" id="s-kb"><div class="row"><span class="k">PEBBLE</span><span class="v">--</span></div><div class="track"><i></i></div></div>
-    </div>
-  </div>
+  <!-- gauges -->
+  <div class="t orb" id="gPhone" style="left:34px;top:150px;width:80px;text-align:center;font-size:17px">--</div>
+  <div class="t mono" style="left:34px;top:172px;width:80px;text-align:center;font-size:7.5px;color:var(--cyd);letter-spacing:.14em">TELEFON</div>
+  <div class="t orb" id="gTemp" style="left:132px;top:150px;width:80px;text-align:center;font-size:17px">--</div>
+  <div class="t mono" style="left:132px;top:172px;width:80px;text-align:center;font-size:7.5px;color:var(--cyd);letter-spacing:.14em">TEMP</div>
+  <div class="t orb" id="gLap" style="left:44px;top:252px;width:90px;text-align:center;font-size:15px">--</div>
+  <div class="t orb" id="gCpu" style="left:44px;top:271px;width:90px;text-align:center;font-size:11px;color:var(--cy2)">CPU --</div>
+  <div class="t mono" style="left:44px;top:289px;width:90px;text-align:center;font-size:7px;color:var(--cyd);letter-spacing:.14em">LAPTOP</div>
+  <div class="t mono" id="host" style="left:150px;top:246px;font-size:9px;color:var(--cyd);letter-spacing:.14em">HOST / OFFLINE</div>
+  <div class="t" id="np" style="left:150px;top:262px;width:240px;font-size:12px;color:var(--or);overflow:hidden;text-overflow:ellipsis"></div>
 
-  <div class="core" id="core">
-    <svg viewBox="0 0 400 400">
-      <circle cx="200" cy="200" r="196" fill="none" stroke="rgba(0,200,255,.18)" stroke-width="1"/>
-      <g class="spin3"><circle cx="200" cy="200" r="186" fill="none" stroke="rgba(0,200,255,.45)" stroke-width="7" stroke-dasharray="1.2 7.5"/></g>
-      <g class="spin"><circle cx="200" cy="200" r="172" fill="none" stroke="#00c8ff" stroke-width="3.2" stroke-dasharray="26 12" opacity=".75"/></g>
-      <g class="spin2"><circle cx="200" cy="200" r="158" fill="none" stroke="#ff9128" stroke-width="3" stroke-dasharray="90 160 40 210 70 380" opacity=".9"/></g>
-      <circle cx="200" cy="200" r="146" fill="none" stroke="rgba(0,200,255,.30)" stroke-width="1.2"/>
-    </svg>
-    <div class="glow"></div><div class="holo" id="holo"></div>
-    <div class="talk">TAP TO TALK</div>
-  </div>
-  <div class="jst">JARVIS // <b id="jst" class="off">OFFLINE</b></div>
+  <!-- left wedge: diagnostics + hologram -->
+  <div class="holo" id="holo" style="left:36px;top:420px;width:150px;height:150px"></div>
+  <!-- centre hub: tap to talk -->
+  <div class="hit" id="hub" style="left:162px;top:452px;width:106px;height:106px"></div>
+  <div class="t orb" id="hubTxt" style="left:165px;top:491px;width:100px;text-align:center;font-size:12px;letter-spacing:.14em;pointer-events:none">JARVIS</div>
+  <div class="t mono" id="hubSub" style="left:165px;top:510px;width:100px;text-align:center;font-size:8px;color:var(--cy2);letter-spacing:.18em;pointer-events:none">TAP TO TALK</div>
 
-  <div class="sh">PRECICE // LAUNCH</div>
-  <div class="grid" id="fav"></div>
-  <div class="spacer"></div>
+  <!-- right fan: shortcuts -->
+  <div id="fan"></div>
 
-  <div class="dock">
-    <button id="allbtn">SVE APLIKACIJE</button>
-    <button class="j" id="jbtn">JARVIS</button>
-    <button class="s" id="setbtn">⚙</button>
-  </div>
+  <!-- clock dial + peripherals -->
+  <div class="t orb" id="clk" style="left:58px;top:650px;width:100px;text-align:center;font-size:21px;text-shadow:0 0 8px rgba(30,200,255,.9)">--:--</div>
+  <div class="t mono" id="day" style="left:58px;top:676px;width:100px;text-align:center;font-size:8px;color:var(--cy2);letter-spacing:.14em"></div>
+  <div class="t" style="left:170px;top:628px;font-size:11px;letter-spacing:.06em">SONY</div><div class="t orb" id="pHp" style="left:226px;top:628px;width:44px;text-align:right;font-size:11px">--</div>
+  <div class="bar" id="bHp" style="left:170px;top:645px;width:100px"><i></i></div>
+  <div class="t" style="left:170px;top:656px;font-size:11px;letter-spacing:.06em">PEBBLE</div><div class="t orb" id="pKb" style="left:226px;top:656px;width:44px;text-align:right;font-size:11px">--</div>
+  <div class="bar" id="bKb" style="left:170px;top:673px;width:100px"><i></i></div>
+  <div class="t mono" id="jst" style="left:170px;top:686px;font-size:8.5px;letter-spacing:.16em;color:var(--cyd)">JARVIS // --</div>
+
+  <!-- dock -->
+  <div class="dock" id="dSet" style="left:19px;top:731px"></div>
+  <div class="dock" id="dAll" style="left:119px;top:731px"></div>
+  <div class="dock" id="dTalk" style="left:219px;top:731px"></div>
+  <div class="dock" id="dJar" style="left:319px;top:731px"></div>
 </div>
 
 <div class="drawer" id="drawer">
   <div class="top2"><input id="q" placeholder="Pretraži aplikacije…" autocomplete="off"><button class="x" id="close">✕</button></div>
   <div class="list"><div class="grid" id="all"></div></div>
 </div>
-
 <div class="menu" id="menu"><div class="box" id="mbox"></div></div>
 
 <script>
 (() => {
   const H = window.JarvisHome || null;
   const $ = id => document.getElementById(id);
+  const NS = "http://www.w3.org/2000/svg";
   const DAYS = ["NEDELJA", "PONEDELJAK", "UTORAK", "SREDA", "ČETVRTAK", "PETAK", "SUBOTA"];
+  const CY = "#1ec8ff", OR = "#ff9128", RED = "#ff3a3a";
   let APPS = [], ICONS = {}, FAV = [];
   try { ICONS = JSON.parse(localStorage.getItem("home_icons") || "{}"); } catch (e) {}
   try { FAV = JSON.parse(localStorage.getItem("home_fav") || "null"); } catch (e) {}
 
-  // ---------- clock (like the laptop clock)
-  function tick() {
-    const d = new Date(), p = n => String(n).padStart(2, "0");
-    $("hm").textContent = p(d.getHours()) + ":" + p(d.getMinutes());
-    $("sec").textContent = p(d.getSeconds());
-    $("day").textContent = DAYS[d.getDay()];
-    $("date").textContent = p(d.getDate()) + "." + p(d.getMonth() + 1) + "." + d.getFullYear();
-    const cM = 2 * Math.PI * 41, cS = 2 * Math.PI * 35;
-    $("arcM").setAttribute("stroke-dasharray", `${cM * d.getMinutes() / 60} ${cM}`);
-    $("arcS").setAttribute("stroke-dasharray", `${cS * d.getSeconds() / 60} ${cS}`);
+  // ---------- fit the 400x820 stage to the screen
+  function fit() {
+    const s = Math.min(innerWidth / 400, innerHeight / 820);
+    $("stage").style.transform = `translate(-50%,-50%) scale(${s})`;
   }
-  tick(); setInterval(tick, 1000);
+  fit(); addEventListener("resize", fit);
+
+  // ---------- drawing helpers
+  const svg = $("deco");
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    (parent || svg).appendChild(e); return e;
+  }
+  const rad = a => a * Math.PI / 180;
+  const pt = (cx, cy, r, a) => [cx + r * Math.cos(rad(a)), cy + r * Math.sin(rad(a))];
+  function arc(cx, cy, r, a1, a2) {               // open arc, angles clockwise from 3 o'clock
+    const [x1, y1] = pt(cx, cy, r, a1), [x2, y2] = pt(cx, cy, r, a2);
+    return `M${x1} ${y1} A${r} ${r} 0 ${a2 - a1 > 180 ? 1 : 0} 1 ${x2} ${y2}`;
+  }
+  function wedge(cx, cy, r1, r2, a1, a2) {         // filled ring sector
+    const [x1, y1] = pt(cx, cy, r2, a1), [x2, y2] = pt(cx, cy, r2, a2), [x3, y3] = pt(cx, cy, r1, a2), [x4, y4] = pt(cx, cy, r1, a1);
+    const L = a2 - a1 > 180 ? 1 : 0;
+    return `M${x1} ${y1} A${r2} ${r2} 0 ${L} 1 ${x2} ${y2} L${x3} ${y3} A${r1} ${r1} 0 ${L} 0 ${x4} ${y4}Z`;
+  }
+  function ring(cx, cy, r, w, color, op, dash, parent) {
+    const a = { cx, cy, r, fill: "none", stroke: color, "stroke-width": w, opacity: op == null ? 1 : op };
+    if (dash) a["stroke-dasharray"] = dash;
+    return el("circle", a, parent);
+  }
+  function group(cx, cy, cls) {                    // rotates around (cx, cy)
+    const g = el("g", { class: cls || "" }); g.style.transformOrigin = `${cx}px ${cy}px`; return g;
+  }
+
+  const defs = el("defs", {});
+  defs.innerHTML = `<filter id="gl" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="pan" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#0a6fa8" stop-opacity=".55"/><stop offset="1" stop-color="#05304d" stop-opacity=".15"/></linearGradient>
+    <radialGradient id="hubg"><stop offset="0" stop-color="#0d6ea6" stop-opacity=".55"/><stop offset=".7" stop-color="#022640" stop-opacity=".9"/><stop offset="1" stop-color="#000" stop-opacity="1"/></radialGradient>`;
+
+  // ---------- header plate + lines
+  el("path", { d: "M14 22 L218 22 L232 36 L218 50 L14 50 L8 44 L8 28Z", fill: "rgba(0,80,130,.35)", stroke: CY, "stroke-width": 1.2, filter: "url(#gl)" });
+  el("path", { d: "M232 36 L300 36 M8 64 L180 64", stroke: CY, "stroke-width": .8, opacity: .5 });
+  el("path", { d: "M0 6 L400 6", stroke: CY, "stroke-width": .6, opacity: .35 });
+  ring(354, 62, 33, 1, CY, .35);
+  ring(354, 62, 27, 6, CY, .9, "1.5 2.2").setAttribute("filter", "url(#gl)");
+  const wArc = el("path", { d: arc(354, 62, 37, -90, 120), fill: "none", stroke: CY, "stroke-width": 2.5, filter: "url(#gl)" });
+
+  // ---------- gauges
+  function gauge(cx, cy, r, w) {
+    ring(cx, cy, r + 7, 1, CY, .3, "1 3");
+    ring(cx, cy, r, w, CY, .12);
+    const p = el("path", { d: arc(cx, cy, r, -90, -89.9), fill: "none", stroke: CY, "stroke-width": w, filter: "url(#gl)" });
+    ring(cx, cy, r - w, 1, CY, .45);
+    return (pct, color) => {
+      const v = Math.max(0.5, Math.min(99.9, pct || 0));
+      p.setAttribute("d", arc(cx, cy, r, -90, -90 + 360 * v / 100)); p.setAttribute("stroke", color || CY);
+    };
+  }
+  const gPhone = gauge(74, 160, 36, 6), gTemp = gauge(172, 160, 36, 6);
+  ring(89, 270, 50, 1, CY, .3);
+  ring(89, 270, 44, 10, "#9fb8c8", .18);
+  const gLap = gauge(89, 270, 44, 10);
+  ring(89, 270, 32, 1.5, CY, .6, "2 3");
+
+  // ---------- main radial HUD
+  const cx = 215, cy = 505;
+  ring(cx, cy, 178, .8, CY, .22);
+  const gT = group(cx, cy, "spin"); ring(cx, cy, 168, 7, CY, .45, "1.2 4.6", gT);
+  const gA = group(cx, cy, "spinr");
+  [[0, 40], [52, 120], [132, 150], [200, 285], [298, 338]].forEach(([a, b]) =>
+    el("path", { d: arc(cx, cy, 150, a, b), fill: "none", stroke: CY, "stroke-width": 9, opacity: .55, filter: "url(#gl)" }, gA));
+  const gB = group(cx, cy, "spin");
+  [[20, 70], [160, 175], [230, 250]].forEach(([a, b]) => el("path", { d: arc(cx, cy, 136, a, b), fill: "none", stroke: OR, "stroke-width": 3, opacity: .85 }, gB));
+  ring(cx, cy, 126, 1.2, CY, .4);
+  el("path", { d: wedge(cx, cy, 62, 182, 148, 238), fill: "url(#pan)", stroke: CY, "stroke-width": 1.2, opacity: .95 });
+  for (let a = 153; a < 236; a += 6) { const [x1, y1] = pt(cx, cy, 170, a), [x2, y2] = pt(cx, cy, 178, a); el("line", { x1, y1, x2, y2, stroke: CY, "stroke-width": 1, opacity: .7 }); }
+  const lab = el("text", { x: 0, y: 0, fill: CY, "font-family": "Orbitron", "font-size": 8.5, "letter-spacing": "2" });
+  lab.textContent = "SYSTEM DIAGNOSTICS";
+  lab.setAttribute("transform", "translate(62,598) rotate(-78)");
+  el("path", { d: wedge(cx, cy, 62, 168, -42, 42), fill: "rgba(0,40,70,.55)", stroke: CY, "stroke-width": 1, opacity: .9 });
+  for (let k = -2; k <= 2; k++) { const [x1, y1] = pt(cx, cy, 64, k * 16), [x2, y2] = pt(cx, cy, 120, k * 16); el("line", { x1, y1, x2, y2, stroke: CY, "stroke-width": .8, opacity: .5 }); }
+  ring(cx, cy, 64, 2, CY, .9).setAttribute("filter", "url(#gl)");
+  el("circle", { cx, cy, r: 58, fill: "url(#hubg)" });
+  const gH = group(cx, cy, "spinf"); ring(cx, cy, 50, 3, CY, .8, "14 6 4 6", gH);
+  const gH2 = group(cx, cy, "spinr"); ring(cx, cy, 42, 1.2, OR, .9, "40 20", gH2);
+  [0, 90, 180, 270].forEach(a => { const [x1, y1] = pt(cx, cy, 58, a), [x2, y2] = pt(cx, cy, 70, a); el("line", { x1, y1, x2, y2, stroke: CY, "stroke-width": 2 }); });
+
+  // ---------- clock dial (lower left)
+  const kx = 108, ky = 668;
+  ring(kx, ky, 54, 1, CY, .35);
+  const gK = group(kx, ky, "spinr"); ring(kx, ky, 48, 5, CY, .5, "2 3", gK);
+  ring(kx, ky, 40, 1.5, CY, .8).setAttribute("filter", "url(#gl)");
+  const secArc = el("path", { d: arc(kx, ky, 44, -90, -89), fill: "none", stroke: OR, "stroke-width": 3 });
+  el("path", { d: "M162 640 L170 640 M162 668 L170 668", stroke: CY, "stroke-width": 1, opacity: .6 });
+
+  // ---------- dock: 4 round buttons
+  function dockBtn(x, y, kind, color) {
+    ring(x, y, 29, 2, color, 1).setAttribute("filter", "url(#gl)");
+    ring(x, y, 23, 5, color, .45, "2 2.4");
+    ring(x, y, 17, 1, color, .8);
+    const g = el("g", { stroke: color, fill: "none", "stroke-width": 2.4, "stroke-linecap": "round", "stroke-linejoin": "round", filter: "url(#gl)" });
+    if (kind === "gear") { ring(x, y, 7, 2.4, color, 1, null, g); for (let a = 0; a < 360; a += 45) { const [x1, y1] = pt(x, y, 9, a), [x2, y2] = pt(x, y, 12, a); el("line", { x1, y1, x2, y2 }, g); } }
+    if (kind === "up") { el("path", { d: `M${x - 10} ${y + 5} L${x} ${y - 6} L${x + 10} ${y + 5}` }, g); el("path", { d: `M${x - 6} ${y + 10} L${x} ${y + 3} L${x + 6} ${y + 10}`, opacity: .6 }, g); }
+    if (kind === "mic") { el("rect", { x: x - 4, y: y - 11, width: 8, height: 14, rx: 4 }, g); el("path", { d: `M${x - 8} ${y} a8 8 0 0 0 16 0 M${x} ${y + 8} v4` }, g); }
+    if (kind === "core") { ring(x, y, 9, 2.4, color, 1, null, g); ring(x, y, 3, 3, color, 1, null, g); }
+  }
+  dockBtn(50, 762, "gear", CY); dockBtn(150, 762, "up", CY); dockBtn(250, 762, "mic", OR); dockBtn(350, 762, "core", CY);
+  el("path", { d: "M0 806 L400 806", stroke: CY, "stroke-width": .6, opacity: .35 });
 
   // ---------- hologram animation
   let frame = 0, last = 0;
@@ -185,48 +244,79 @@
     requestAnimationFrame(anim);
   })(0);
 
-  // ---------- batteries + laptop
-  function stat(id, pct) {
-    const el = $(id), n = parseInt(pct, 10);
-    el.querySelector(".v").textContent = isNaN(n) ? "--" : n + "%";
-    el.querySelector("i").style.width = (isNaN(n) ? 0 : n) + "%";
-    el.classList.toggle("low", !isNaN(n) && n <= 20);
+  // ---------- clock
+  function tick() {
+    const d = new Date(), p = n => String(n).padStart(2, "0");
+    $("clk").textContent = p(d.getHours()) + ":" + p(d.getMinutes());
+    $("day").textContent = DAYS[d.getDay()];
+    $("dateTop").textContent = DAYS[d.getDay()].slice(0, 3) + " " + p(d.getDate()) + "." + p(d.getMonth() + 1) + "." + d.getFullYear();
+    secArc.setAttribute("d", arc(kx, ky, 44, -90, -90 + Math.max(1, d.getSeconds() * 6)));
   }
-  function phone() { if (!H) return; try { const o = JSON.parse(H.battery()); stat("s-phone", o.pct); } catch (e) {} }
+  tick(); setInterval(tick, 1000);
+
+  // ---------- data
+  function pctColor(n) { return n <= 20 ? RED : CY; }
+  function setBar(id, pid, v) { const n = parseInt(v, 10); $(pid).textContent = isNaN(n) ? "--" : n + "%";
+    $(id).querySelector("i").style.width = (isNaN(n) ? 0 : n) + "%"; $(id).classList.toggle("low", !isNaN(n) && n <= 20); }
+  function phone() {
+    if (!H) return;
+    try { const o = JSON.parse(H.battery()); $("gPhone").textContent = o.pct + "%"; gPhone(o.pct, o.charging ? OR : pctColor(o.pct)); } catch (e) {}
+  }
+  const WMO = {0:"VEDRO",1:"PRETEŽNO VEDRO",2:"DELIMIČNO OBLAČNO",3:"OBLAČNO",45:"MAGLA",48:"MAGLA",51:"ROMINJANJE",53:"ROMINJANJE",55:"ROMINJANJE",
+    61:"SLABA KIŠA",63:"KIŠA",65:"JAKA KIŠA",71:"SLAB SNEG",73:"SNEG",75:"JAK SNEG",80:"PLJUSKOVI",81:"PLJUSKOVI",82:"JAKI PLJUSKOVI",95:"GRMLJAVINA",96:"GRMLJAVINA",99:"GRMLJAVINA"};
+  async function weather() {
+    try {
+      const d = await (await fetch("https://api.open-meteo.com/v1/forecast?latitude=44.787&longitude=20.457&current=temperature_2m,weather_code&timezone=auto")).json();
+      const t = Math.round(d.current.temperature_2m);
+      $("tempTop").textContent = t + "°"; $("gTemp").textContent = t + "°C"; $("cond").textContent = WMO[d.current.weather_code] || "";
+      gTemp((t + 10) * 2, t >= 30 ? RED : t <= 0 ? "#9fe0ff" : OR);
+      wArc.setAttribute("d", arc(354, 62, 37, -90, -90 + Math.max(5, Math.min(355, (t + 10) * 7.2))));
+    } catch (e) {}
+  }
   async function laptop() {
     const base = localStorage.getItem("kadar_base"), key = localStorage.getItem("kadar_key");
-    if (!base || !key) { const on = H && H.backgroundOn(); $("jst").textContent = on ? "LISTENING" : "TAP TO TALK"; $("jst").className = ""; return; }
+    if (!base || !key) { $("jst").textContent = H && H.backgroundOn() ? "JARVIS // LISTENING" : "JARVIS // READY"; return; }
     try {
       const ctl = new AbortController(); setTimeout(() => ctl.abort(), 5000);
       const s = await (await fetch(base + "/api/status", { headers: { "X-Kadar-Key": key }, signal: ctl.signal })).json();
-      $("hostst").textContent = "ONLINE"; if (s.host) $("host").textContent = s.host;
-      $("jst").textContent = s.asleep ? "STANDBY" : "ONLINE"; $("jst").className = "";
-      stat("s-laptop", s.laptop && s.laptop.pct);
-      stat("s-hp", s.headphones && s.headphones.pct); stat("s-kb", s.keyboard && s.keyboard.pct);
+      $("host").textContent = "HOST / ONLINE · " + (s.host || "LAPTOP");
+      $("jst").textContent = "JARVIS // " + (s.asleep ? "STANDBY" : "ONLINE");
+      const lp = s.laptop && s.laptop.pct; $("gLap").textContent = lp != null ? lp + "%" : "--"; gLap(lp || 0, lp != null ? pctColor(lp) : CY);
+      $("gCpu").textContent = "CPU " + (s.cpu != null ? s.cpu + "%" : "--");
+      setBar("bHp", "pHp", s.headphones && s.headphones.pct); setBar("bKb", "pKb", s.keyboard && s.keyboard.pct);
+      $("np").textContent = s.now_playing ? "♪ " + s.now_playing.toUpperCase() : "";
     } catch (e) {
-      $("hostst").textContent = "OFFLINE"; $("jst").textContent = H && H.backgroundOn() ? "LISTENING" : "OFFLINE";
-      $("jst").className = H && H.backgroundOn() ? "" : "off";
+      $("host").textContent = "HOST / OFFLINE"; $("jst").textContent = H && H.backgroundOn() ? "JARVIS // LISTENING" : "JARVIS // READY";
     }
   }
-  phone(); laptop(); setInterval(phone, 30000); setInterval(laptop, 15000);
+  phone(); weather(); laptop();
+  setInterval(phone, 30000); setInterval(laptop, 15000); setInterval(weather, 15 * 60000);
 
   // ---------- apps
-  function tile(a, fav) {
+  function byPkg(p) { return APPS.find(a => a.pkg === p); }
+  function launch(a) { if (H) H.launch(a.pkg); closeDrawer(); }
+  function pressable(node, a) {
+    let timer = null, long = false;
+    node.addEventListener("touchstart", () => { long = false; timer = setTimeout(() => { long = true; menuFor(a); }, 550); }, { passive: true });
+    node.addEventListener("touchend", () => clearTimeout(timer));
+    node.addEventListener("touchmove", () => clearTimeout(timer), { passive: true });
+    node.addEventListener("click", () => { if (!long) launch(a); });
+    node.addEventListener("contextmenu", e => { e.preventDefault(); menuFor(a); });
+  }
+  function renderFav() {
+    const f = $("fan"); f.innerHTML = "";
+    FAV.map(byPkg).filter(Boolean).slice(0, 10).forEach((a, k) => {
+      const it = document.createElement("div"); it.className = "it";
+      it.style.marginRight = Math.round((k - 4.5) * (k - 4.5) * 1.3) + "px";   // follows the curve of the ring
+      it.innerHTML = "<span></span><i></i>"; it.querySelector("span").textContent = a.label.toUpperCase();
+      pressable(it, a); f.appendChild(it);
+    });
+  }
+  function tile(a) {
     const d = document.createElement("div"); d.className = "app"; d.dataset.pkg = a.pkg;
     d.innerHTML = (ICONS[a.pkg] ? `<img src="${ICONS[a.pkg]}">` : `<div class="ph"></div>`) + `<span></span>`;
     d.querySelector("span").textContent = a.label.toUpperCase();
-    let timer = null, long = false;
-    d.addEventListener("touchstart", () => { long = false; timer = setTimeout(() => { long = true; menuFor(a); }, 550); }, { passive: true });
-    d.addEventListener("touchend", () => clearTimeout(timer));
-    d.addEventListener("touchmove", () => clearTimeout(timer), { passive: true });
-    d.addEventListener("click", () => { if (long) return; if (H) H.launch(a.pkg); closeDrawer(); });
-    d.addEventListener("contextmenu", e => { e.preventDefault(); menuFor(a); });
-    return d;
-  }
-  function byPkg(p) { return APPS.find(a => a.pkg === p); }
-  function renderFav() {
-    const g = $("fav"); g.innerHTML = "";
-    FAV.map(byPkg).filter(Boolean).slice(0, 8).forEach(a => g.appendChild(tile(a, true)));
+    pressable(d, a); return d;
   }
   function renderAll() {
     const q = $("q").value.trim().toLowerCase(), g = $("all"); g.innerHTML = "";
@@ -242,21 +332,24 @@
   function loadApps() {
     if (!H) return;
     try { APPS = JSON.parse(H.apps()); } catch (e) { APPS = []; }
-    if (!FAV) {     // first start: some useful ones
+    if (!FAV) {
       const want = ["com.openai.chatgpt", "com.spotify.music", "com.google.android.youtube", "com.instagram.android",
                     "com.whatsapp", "com.google.android.apps.maps", "com.android.chrome", "com.anthropic.claude",
                     "com.google.android.gm", "com.google.android.calendar", "com.viber.voip", "com.netflix.mediaclient"];
-      FAV = want.filter(p => byPkg(p)).slice(0, 8);
+      FAV = want.filter(p => byPkg(p)).slice(0, 10);
       localStorage.setItem("home_fav", JSON.stringify(FAV));
     }
     renderFav(); if ($("drawer").classList.contains("open")) renderAll();
+  }
+  let iconsAsked = false;
+  function askIcons() {
+    if (!H || iconsAsked) return; iconsAsked = true;
     const missing = APPS.map(a => a.pkg).filter(p => !ICONS[p]);
-    const order = FAV.filter(p => missing.includes(p)).concat(missing.filter(p => !FAV.includes(p)));
-    if (order.length) H.loadIcons(JSON.stringify(order));
+    if (missing.length) H.loadIcons(JSON.stringify(missing));
   }
   loadApps();
 
-  // ---------- long-press menu
+  // ---------- menus
   function menuFor(a) {
     const isFav = FAV.includes(a.pkg), box = $("mbox");
     box.innerHTML = `<h3></h3>`; box.querySelector("h3").textContent = a.label.toUpperCase();
@@ -264,8 +357,8 @@
       b.onclick = () => { closeMenu(); fn(); }; box.appendChild(b); };
     btn("Otvori", () => H && H.launch(a.pkg));
     if (isFav) btn("Ukloni iz prečica", () => { FAV = FAV.filter(p => p !== a.pkg); saveFav(); });
-    else btn(FAV.length >= 8 ? "Dodaj u prečice (zameni poslednju)" : "Dodaj u prečice", () => { if (FAV.length >= 8) FAV.pop(); FAV.push(a.pkg); saveFav(); });
-    if (isFav) btn("Pomeri na početak", () => { FAV = [a.pkg].concat(FAV.filter(p => p !== a.pkg)); saveFav(); });
+    else btn(FAV.length >= 10 ? "Dodaj u prečice (zameni poslednju)" : "Dodaj u prečice", () => { if (FAV.length >= 10) FAV.pop(); FAV.push(a.pkg); saveFav(); });
+    if (isFav) btn("Pomeri na vrh", () => { FAV = [a.pkg].concat(FAV.filter(p => p !== a.pkg)); saveFav(); });
     btn("Informacije o aplikaciji", () => H && H.appInfo(a.pkg));
     btn("Deinstaliraj", () => H && H.uninstall(a.pkg), "d");
     $("menu").classList.add("open");
@@ -275,25 +368,22 @@
   $("menu").onclick = e => { if (e.target.id === "menu") closeMenu(); };
   function settingsMenu() {
     const box = $("mbox"); box.innerHTML = "<h3>JARVIS HUD // PODEŠAVANJA</h3>";
-    const btn = (label, fn, cls) => { const b = document.createElement("button"); b.textContent = label; if (cls) b.className = cls;
-      b.onclick = () => { closeMenu(); fn(); }; box.appendChild(b); };
+    const btn = (label, fn) => { const b = document.createElement("button"); b.textContent = label; b.onclick = () => { closeMenu(); fn(); }; box.appendChild(b); };
     btn("Otvori Jarvis", () => H && H.openJarvis());
     btn("Podešavanja telefona", () => H && H.phoneSettings());
     btn("Promeni početni ekran (vrati stari)", () => H && H.homeSettings());
     $("menu").classList.add("open");
   }
-
-  // ---------- drawer
-  function openDrawer() { $("drawer").classList.add("open"); $("q").value = ""; renderAll(); }
+  function openDrawer() { $("drawer").classList.add("open"); $("q").value = ""; askIcons(); renderAll(); }
   function closeDrawer() { $("drawer").classList.remove("open"); $("q").blur(); }
-  $("allbtn").onclick = openDrawer; $("close").onclick = closeDrawer; $("q").oninput = renderAll;
-  $("jbtn").onclick = () => H && H.openJarvis();
-  $("setbtn").onclick = settingsMenu;
-  $("core").onclick = () => H && H.talk();
-  // swipe up anywhere on the home screen = all apps
+
+  $("close").onclick = closeDrawer; $("q").oninput = renderAll;
+  $("dSet").onclick = settingsMenu; $("dAll").onclick = openDrawer;
+  $("dTalk").onclick = () => H && H.talk(); $("hub").onclick = () => H && H.talk();
+  $("dJar").onclick = () => H && H.openJarvis();
   let y0 = null;
-  $("home").addEventListener("touchstart", e => { y0 = e.touches[0].clientY; }, { passive: true });
-  $("home").addEventListener("touchend", e => { if (y0 != null && y0 - e.changedTouches[0].clientY > 90) openDrawer(); y0 = null; });
+  $("stage").addEventListener("touchstart", e => { y0 = e.touches[0].clientY; }, { passive: true });
+  $("stage").addEventListener("touchend", e => { if (y0 != null && y0 - e.changedTouches[0].clientY > 90) openDrawer(); y0 = null; });
 
   window.homeBack = () => { if ($("menu").classList.contains("open")) closeMenu(); else closeDrawer(); };
   window.homePressed = () => { closeMenu(); closeDrawer(); };
