@@ -20,6 +20,14 @@ import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
 /**
  * Keeps listening for "Hey Jarvis" in the background (like the laptop), with a small notification.
  * On the wake word it frees the microphone and opens Jarvis, which listens for the command.
@@ -33,6 +41,7 @@ public class JarvisService extends Service {
     private volatile boolean running = false;
     private volatile boolean paused = false;
     private volatile long pausedUntil = 0;
+    private float ambient = 300f;
     private Thread loop;
 
     public static void send(Context ctx, String action) {
@@ -133,13 +142,17 @@ public class JarvisService extends Service {
                     continue;
                 }
                 float score = ww.process(buf);
+                float level = rms(buf);
+                if (score < 0.1f) ambient = ambient * 0.97f + level * 0.03f;   // background noise level
                 long now = SystemClock.elapsedRealtime();
                 if (score > THRESHOLD && now > cooldownUntil) {
                     cooldownUntil = now + 3000;
-                    rec.stop(); rec.release(); rec = null;     // free the mic for the command
                     paused = true;
-                    pausedUntil = now + 30000;
-                    wake();
+                    pausedUntil = now + 40000;
+                    wake();                                       // Jarvis pops up right away...
+                    byte[] speech = recordCommand(rec, buf);      // ...while we keep recording, so you can talk in one go
+                    rec.stop(); rec.release(); rec = null;        // free the mic
+                    deliver(speech);
                 }
             }
         } catch (Exception e) {
@@ -164,6 +177,86 @@ public class JarvisService extends Service {
             return null;
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    private static float rms(short[] b) {
+        double sum = 0;
+        for (short v : b) sum += (double) v * v;
+        return (float) Math.sqrt(sum / b.length);
+    }
+
+    /** record what you say right after "Hey Jarvis" (until a short pause), as 16-bit PCM */
+    private byte[] recordCommand(AudioRecord rec, short[] buf) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        float startLevel = Math.max(600f, ambient * 2.5f);
+        float stopLevel = Math.max(450f, ambient * 1.8f);
+        long t0 = SystemClock.elapsedRealtime();
+        long lastLoud = 0;
+        boolean speaking = false;
+        while (running) {
+            int got = 0;
+            while (got < buf.length) {
+                int n = rec.read(buf, got, buf.length - got);
+                if (n <= 0) return speaking ? out.toByteArray() : null;
+                got += n;
+            }
+            for (short v : buf) { out.write(v & 0xff); out.write((v >> 8) & 0xff); }
+            long now = SystemClock.elapsedRealtime();
+            float level = rms(buf);
+            if (level > startLevel) { speaking = true; lastLoud = now; }
+            else if (speaking && level > stopLevel) lastLoud = now;
+            if (!speaking && now - t0 > 2500) return null;                 // only "Hey Jarvis": ask what I want
+            if (speaking && now - lastLoud > 800) break;                  // you stopped talking
+            if (now - t0 > 8000) break;
+        }
+        return speaking ? out.toByteArray() : null;
+    }
+
+    /** the laptop's Whisper turns the recording into text; then Jarvis on the phone carries it out */
+    private void deliver(byte[] speech) {
+        String text = null;
+        String status;
+        if (speech == null) status = "empty";
+        else {
+            text = transcribe(speech);
+            status = text == null ? "failed" : text.trim().isEmpty() ? "empty" : "text";
+        }
+        Intent i = new Intent(this, MainActivity.class)
+                .putExtra("cmd_status", status)
+                .putExtra("cmd", text == null ? "" : text)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+        try { startActivity(i); } catch (Exception e) { Log.w(TAG, "deliver: " + e); paused = false; }
+    }
+
+    private String transcribe(byte[] pcm) {
+        SharedPreferences p = prefs(this);
+        String base = p.getString("base", ""), key = p.getString("key", "");
+        if (base.isEmpty() || key.isEmpty()) return null;
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) new URL(base + "/api/transcribe").openConnection();
+            c.setConnectTimeout(2500);
+            c.setReadTimeout(15000);
+            c.setDoOutput(true);
+            c.setRequestMethod("POST");
+            c.setRequestProperty("X-Kadar-Key", key);
+            c.setRequestProperty("Content-Type", "application/octet-stream");
+            c.setFixedLengthStreamingMode(pcm.length);
+            try (OutputStream os = c.getOutputStream()) { os.write(pcm); }
+            if (c.getResponseCode() != 200) return null;
+            ByteArrayOutputStream body = new ByteArrayOutputStream();
+            try (InputStream is = c.getInputStream()) {
+                byte[] b = new byte[4096];
+                int n;
+                while ((n = is.read(b)) > 0) body.write(b, 0, n);
+            }
+            return new JSONObject(body.toString("UTF-8")).optString("text", "");
+        } catch (Exception e) {
+            Log.w(TAG, "transcribe: " + e);
+            return null;
+        } finally {
+            if (c != null) c.disconnect();
         }
     }
 

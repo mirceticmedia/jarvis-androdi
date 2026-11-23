@@ -254,6 +254,7 @@
       if (!k) throw new Error("no key");
       BASE = u.origin; KEY = k;
       localStorage.setItem("kadar_base", BASE); localStorage.setItem("kadar_key", KEY);
+      if (NATIVE && NATIVE.setLink) NATIVE.setLink(BASE, KEY);
       $("linkcard").style.display = "none"; refresh(); return true;
     } catch (e) { return false; }
   }
@@ -610,6 +611,15 @@
   window.jnBackground = on => paintBg(on);
   window.jnNote = what => { if (what === "overlay") line("j", "One more step: allow 'Display over other apps' for Jarvis, so it can pop up when you call it."); };
   window.jnWake = () => { if (!busy && !listening) listen(); };
+  if (NATIVE && NATIVE.setLink && BASE && KEY) NATIVE.setLink(BASE, KEY);
+  // "Hey Jarvis" from the background: the service records you right away, the laptop's Whisper writes it down
+  window.jnCapturing = () => { $("core").classList.add("listen"); $("talk").textContent = "LISTENING"; $("hint").textContent = "HEY JARVIS…"; };
+  window.jnCommand = async (status, text) => {
+    $("core").classList.remove("listen"); $("talk").textContent = "TAP TO TALK"; $("hint").innerHTML = "&nbsp;";
+    if (status === "text" && text) return run(text);
+    if (status === "empty") { await reply("Yes, sir?"); return listen(); }
+    listen();                                            // laptop not reachable: the phone listens itself
+  };
   if (IN_APP && !BASE) $("linkcard").style.display = "block";
   if (!IN_APP && "serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("/sw.js").catch(() => {});
   if (!navigator.onLine) line("j", "No internet. Time, battery, timers and opening apps still work; voice needs the keyboard mic in offline mode.");

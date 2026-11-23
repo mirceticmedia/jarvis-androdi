@@ -56,7 +56,7 @@ public class MainActivity extends Activity {
     private boolean micFreed = false;
     private GeolocationPermissions.Callback geoCallback;
     private static final int REQ_BG = 13;
-    private boolean pageReady = false, pendingWake = false, wokeByVoice = false;
+    private boolean pageReady = false, wokeByVoice = false;
     private String geoOrigin;
 
     private boolean has(String perm) {
@@ -99,7 +99,8 @@ public class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 pageReady = true;
-                if (pendingWake) { pendingWake = false; js("window.jnWake && jnWake()"); }
+                for (String c : pendingCalls) js(c);
+                pendingCalls.clear();
             }
         });
         web.setWebChromeClient(new WebChromeClient() {
@@ -139,12 +140,27 @@ public class MainActivity extends Activity {
 
     /** opened by "Hey Jarvis" from the background service: show up (even on the lock screen) and listen */
     private void handleWake(Intent intent) {
-        if (intent == null || !intent.getBooleanExtra("wake", false)) return;
-        intent.removeExtra("wake");
-        wokeByVoice = true;
-        showOnLockScreen(true);
-        if (pageReady) js("window.jnWake && jnWake()");
-        else pendingWake = true;
+        if (intent == null) return;
+        if (intent.getBooleanExtra("wake", false)) {
+            intent.removeExtra("wake");
+            wokeByVoice = true;
+            showOnLockScreen(true);
+            pageCall("window.jnCapturing && jnCapturing()");          // the service is recording what you say
+        }
+        String status = intent.getStringExtra("cmd_status");
+        if (status != null) {
+            String cmd = intent.getStringExtra("cmd");
+            intent.removeExtra("cmd_status");
+            intent.removeExtra("cmd");
+            wokeByVoice = true;
+            pageCall("window.jnCommand && jnCommand(" + JSONObject.quote(status) + "," + JSONObject.quote(cmd == null ? "" : cmd) + ")");
+        }
+    }
+
+    private final java.util.ArrayList<String> pendingCalls = new java.util.ArrayList<>();
+    private void pageCall(String code) {
+        if (pageReady) js(code);
+        else pendingCalls.add(code);
     }
 
     private void showOnLockScreen(boolean on) {
@@ -367,6 +383,11 @@ public class MainActivity extends Activity {
             if (v == null) return;
             if (Build.VERSION.SDK_INT >= 26) v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
             else v.vibrate(ms);
+        }
+
+        /** the laptop address, so the background service can use the laptop's Whisper */
+        @JavascriptInterface public void setLink(String base, String key) {
+            JarvisService.prefs(MainActivity.this).edit().putString("base", base).putString("key", key).apply();
         }
 
         @JavascriptInterface public boolean backgroundOn() { return MainActivity.this.backgroundOn(); }
