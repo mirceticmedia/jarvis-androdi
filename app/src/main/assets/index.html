@@ -478,6 +478,16 @@
       go("Navigate to " + dest, appIntent("www.google.com", "com.google.android.apps.maps", "/maps/dir/?api=1&destination=" + encodeURIComponent(dest)));
       return reply("Navigating to " + dest + "."), true;
     }
+    if (/\b(lets chill|let s chill|chill mode|time to chill|chill time)\b/.test(t)) {   // your Chill playlist, on the phone
+      try {
+        if (laptopOnline) {
+          const r = await api("/api/phone_spotify", { kind: "chill" });
+          if (r.uri) { go("Chill playlist", r.uri); return reply("Chill mode, sir. Playing your Chill playlist."), true; }
+        }
+      } catch (e) {}
+      go("Spotify: chill", "spotify:search:chill");
+      return reply("Chill mode, sir. Opening Spotify."), true;
+    }
     if (/\blets work\b|\bwork mode\b/.test(t)) {                // on the phone: just ChatGPT
       if (NATIVE && NATIVE.openApp("com.openai.chatgpt")) return reply("Work mode, sir. Opening ChatGPT."), true;
       go("Open ChatGPT", appIntent("chatgpt.com", "com.openai.chatgpt"));
