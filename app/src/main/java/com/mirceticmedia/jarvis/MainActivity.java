@@ -147,6 +147,10 @@ public class MainActivity extends Activity {
             showOnLockScreen(true);
             pageCall("window.jnCapturing && jnCapturing()");          // the service is recording what you say
         }
+        if (intent.getBooleanExtra("listen", false)) {        // tapped the hologram on the home screen
+            intent.removeExtra("listen");
+            pageCall("window.jnWake && jnWake()");
+        }
         String status = intent.getStringExtra("cmd_status");
         if (status != null) {
             String cmd = intent.getStringExtra("cmd");

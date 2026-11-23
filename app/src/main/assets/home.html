@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Jarvis HUD</title>
+<style>
+  @font-face{font-family:Orbitron;src:url(fonts/Orbitron.ttf)}
+  @font-face{font-family:Rajdhani;src:url(fonts/Rajdhani-SemiBold.ttf);font-weight:600}
+  @font-face{font-family:Mono;src:url(fonts/ShareTechMono-Regular.ttf)}
+  :root{--bg:#050f18;--cy:#00c8ff;--cy2:#7fe3ff;--cyd:rgba(0,200,255,.55);--cyl:rgba(0,200,255,.22);--or:#ff9128;--red:#ff3b3b;--wh:#e8f6ff}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--wh);font-family:Rajdhani,sans-serif;font-weight:600;overflow:hidden}
+  body{background:
+      radial-gradient(ellipse at 50% 45%,rgba(0,150,230,.20),transparent 60%),
+      linear-gradient(rgba(0,200,255,.05) 1px,transparent 1px) 0 0/34px 34px,
+      linear-gradient(90deg,rgba(0,200,255,.05) 1px,transparent 1px) 0 0/34px 34px,var(--bg)}
+  .frame{position:fixed;inset:6px;pointer-events:none;z-index:0}
+  .frame i{position:absolute;width:30px;height:30px;border:2px solid var(--cyd)}
+  .frame .a{left:0;top:0;border-right:0;border-bottom:0}.frame .b{right:0;top:0;border-left:0;border-bottom:0}
+  .frame .c{left:0;bottom:0;border-right:0;border-top:0}.frame .d{right:0;bottom:0;border-left:0;border-top:0}
+  .frame .l,.frame .r{width:3px;height:64px;border:0;background:var(--or);top:44%;opacity:.8}.frame .l{left:-2px}.frame .r{right:-2px}
+  .home{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;padding:14px 16px 12px}
+
+  .meta{display:flex;justify-content:space-between;font-family:Mono;font-size:9px;letter-spacing:.14em;color:var(--cyd)}
+  .meta b{display:block;font-family:Rajdhani;font-size:13px;color:var(--cy);letter-spacing:.06em}
+  .meta div:last-child{text-align:right}
+  .title{text-align:center;font-family:Orbitron;font-size:21px;letter-spacing:.16em;margin-top:4px;text-shadow:0 0 14px rgba(0,200,255,.45)}
+  .bar{width:34px;height:3px;background:var(--or);margin:4px auto 5px}
+  .cam{text-align:center;font-family:Mono;font-size:9.5px;letter-spacing:.11em;color:var(--cyd);border-bottom:1px solid var(--cyl);padding-bottom:6px;white-space:nowrap;overflow:hidden}
+
+  /* clock + batteries */
+  .top{display:flex;gap:12px;align-items:center;margin-top:10px}
+  .clock{position:relative;width:42vw;max-width:180px;aspect-ratio:1;flex-shrink:0}
+  .clock svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+  .clock .t{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .clock .hm{font-family:Orbitron;font-size:min(8vw,34px);letter-spacing:.02em;text-shadow:0 0 12px rgba(0,200,255,.5)}
+  .clock .sec{font-family:Mono;font-size:12px;color:var(--or);margin-top:-2px}
+  .clock .day{font-size:13px;letter-spacing:.12em;color:var(--cy);margin-top:3px}
+  .clock .date{font-family:Mono;font-size:10px;color:var(--cyd)}
+  .stats{flex:1;min-width:0}
+  .stat{margin-bottom:9px}
+  .stat .row{display:flex;justify-content:space-between;align-items:baseline}
+  .stat .k{font-family:Mono;font-size:9px;letter-spacing:.14em;color:var(--cyd)}
+  .stat .v{font-family:Orbitron;font-size:16px}
+  .stat .track{height:4px;background:rgba(0,200,255,.14);margin-top:3px}
+  .stat .track i{display:block;height:100%;width:0;background:var(--cy);transition:width .6s}
+  .stat.low .track i{background:var(--or)} .stat.low .v{color:#ffc98c}
+
+  /* hologram: tap to talk */
+  .core{position:relative;width:min(64vw,290px);aspect-ratio:1;margin:4px auto 0;flex-shrink:0}
+  .core svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+  .spin{transform-origin:50% 50%;animation:spin 40s linear infinite}.spin2{transform-origin:50% 50%;animation:spin 22s linear infinite reverse}
+  .spin3{transform-origin:50% 50%;animation:spin 70s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .holo{position:absolute;left:50%;top:48%;width:70%;aspect-ratio:1;transform:translate(-50%,-50%);background:url(cam.webp) 0 0/1000% 600% no-repeat;filter:drop-shadow(0 0 10px rgba(0,190,255,.55))}
+  .glow{position:absolute;left:50%;top:50%;width:58%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(0,150,255,.30),rgba(0,90,160,.08) 55%,transparent 70%)}
+  .talk{position:absolute;left:0;right:0;bottom:15%;text-align:center;font-family:Orbitron;font-size:9px;letter-spacing:.3em;color:var(--cy2)}
+  .core:active .holo{filter:drop-shadow(0 0 14px rgba(255,145,40,.8)) hue-rotate(160deg) saturate(1.6)}
+  .jst{text-align:center;font-family:Orbitron;font-size:9px;letter-spacing:.2em;color:var(--cy);margin-top:-6px}
+  .jst b{font-weight:400;color:#3dffa8}.jst b.off{color:var(--red)}
+
+  /* shortcuts */
+  .sh{position:relative;font-family:Orbitron;font-size:11px;letter-spacing:.2em;color:var(--cy);padding-bottom:5px;border-bottom:1px solid var(--cyl);margin:10px 0 8px}
+  .sh:before{content:"";position:absolute;left:0;bottom:-3px;width:30px;height:3px;background:var(--or)}
+  .sh:after{content:"";position:absolute;right:0;bottom:-3px;width:5px;height:5px;background:var(--cy)}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .app{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 2px 6px;border:1px solid var(--cyl);
+    background:linear-gradient(180deg,rgba(0,110,160,.22),rgba(0,60,95,.08));position:relative;min-width:0}
+  .app:after{content:"";position:absolute;left:-1px;bottom:-1px;width:10px;height:2px;background:var(--or)}
+  .app img{width:40px;height:40px;filter:drop-shadow(0 0 6px rgba(0,190,255,.35))}
+  .app .ph{width:40px;height:40px;border:1px dashed var(--cyl)}
+  .app span{font-size:11px;letter-spacing:.04em;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 3px}
+  .app:active{background:rgba(0,200,255,.28)}
+  .spacer{flex:1}
+
+  .dock{display:flex;gap:8px;margin-top:10px}
+  .dock button{flex:1;padding:12px 4px;border:1px solid var(--cyd);background:rgba(0,110,160,.2);color:var(--wh);font-family:Orbitron;font-size:10px;letter-spacing:.16em}
+  .dock button.j{border-color:var(--or);color:#ffd2a0;background:rgba(255,145,40,.12)}
+  .dock button.s{flex:0 0 52px}
+  .dock button:active{background:rgba(0,200,255,.35)}
+
+  /* all apps */
+  .drawer{position:fixed;inset:0;z-index:5;background:rgba(3,10,16,.96);display:flex;flex-direction:column;padding:14px 16px;transform:translateY(100%);transition:transform .25s ease}
+  .drawer.open{transform:none}
+  .drawer .top2{display:flex;gap:8px;align-items:center}
+  .drawer input{flex:1;background:rgba(0,70,110,.25);border:1px solid var(--cyd);color:var(--wh);font:inherit;font-size:16px;padding:10px;outline:none;border-radius:0}
+  .drawer .x{border:1px solid var(--cyd);background:transparent;color:var(--cy);font-family:Orbitron;font-size:11px;padding:11px 12px}
+  .drawer .list{flex:1;overflow-y:auto;margin-top:10px}
+  .drawer .grid{grid-template-columns:repeat(4,1fr)}
+
+  .menu{position:fixed;inset:0;z-index:9;display:none;align-items:flex-end;background:rgba(0,0,0,.5)}
+  .menu.open{display:flex}
+  .menu .box{width:100%;background:#071824;border-top:2px solid var(--cy);padding:14px 16px 22px}
+  .menu .box h3{margin:0 0 10px;font-family:Orbitron;font-size:12px;letter-spacing:.16em;color:var(--cy)}
+  .menu .box button{display:block;width:100%;text-align:left;margin-top:6px;padding:12px;border:1px solid var(--cyl);background:rgba(0,110,160,.16);color:var(--wh);font:inherit;font-size:15px}
+  .menu .box button.d{color:#ffb3b3;border-color:rgba(255,59,59,.4)}
+</style>
+</head>
+<body>
+<div class="frame"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="l"></i><i class="r"></i></div>
+
+<div class="home" id="home">
+  <div class="meta"><div>OPERATOR<b>MOBILE</b></div><div>HOST / <span id="hostst">OFFLINE</span><b id="host">LAPTOP</b></div></div>
+  <div class="title">MIRCETICMEDIA</div><div class="bar"></div>
+  <div class="cam">STBY / 4K UHD / 25.00P / F2.8 / ISO 400 / 5600K / ND OFF</div>
+
+  <div class="top">
+    <div class="clock">
+      <svg viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="47" fill="none" stroke="rgba(0,200,255,.35)" stroke-width="3" stroke-dasharray="0.6 3.3"/>
+        <circle cx="50" cy="50" r="41" fill="none" stroke="rgba(0,200,255,.12)" stroke-width="4"/>
+        <circle id="arcM" cx="50" cy="50" r="41" fill="none" stroke="#00c8ff" stroke-width="4" stroke-dasharray="0 999"/>
+        <circle id="arcS" cx="50" cy="50" r="35" fill="none" stroke="#ff9128" stroke-width="3" stroke-dasharray="0 999"/>
+        <circle cx="50" cy="50" r="30" fill="rgba(0,150,220,.07)" stroke="rgba(0,200,255,.25)" stroke-width="1"/>
+      </svg>
+      <div class="t"><div class="hm" id="hm">--:--</div><div class="sec" id="sec">00</div><div class="day" id="day"></div><div class="date" id="date"></div></div>
+    </div>
+    <div class="stats">
+      <div class="stat" id="s-phone"><div class="row"><span class="k">TELEFON</span><span class="v">--</span></div><div class="track"><i></i></div></div>
+      <div class="stat" id="s-laptop"><div class="row"><span class="k">LAPTOP</span><span class="v">--</span></div><div class="track"><i></i></div></div>
+      <div class="stat" id="s-hp"><div class="row"><span class="k">SONY</span><span class="v">--</span></div><div class="track"><i></i></div></div>
+      <div class="stat" id="s-kb"><div class="row"><span class="k">PEBBLE</span><span class="v">--</span></div><div class="track"><i></i></div></div>
+    </div>
+  </div>
+
+  <div class="core" id="core">
+    <svg viewBox="0 0 400 400">
+      <circle cx="200" cy="200" r="196" fill="none" stroke="rgba(0,200,255,.18)" stroke-width="1"/>
+      <g class="spin3"><circle cx="200" cy="200" r="186" fill="none" stroke="rgba(0,200,255,.45)" stroke-width="7" stroke-dasharray="1.2 7.5"/></g>
+      <g class="spin"><circle cx="200" cy="200" r="172" fill="none" stroke="#00c8ff" stroke-width="3.2" stroke-dasharray="26 12" opacity=".75"/></g>
+      <g class="spin2"><circle cx="200" cy="200" r="158" fill="none" stroke="#ff9128" stroke-width="3" stroke-dasharray="90 160 40 210 70 380" opacity=".9"/></g>
+      <circle cx="200" cy="200" r="146" fill="none" stroke="rgba(0,200,255,.30)" stroke-width="1.2"/>
+    </svg>
+    <div class="glow"></div><div class="holo" id="holo"></div>
+    <div class="talk">TAP TO TALK</div>
+  </div>
+  <div class="jst">JARVIS // <b id="jst" class="off">OFFLINE</b></div>
+
+  <div class="sh">PRECICE // LAUNCH</div>
+  <div class="grid" id="fav"></div>
+  <div class="spacer"></div>
+
+  <div class="dock">
+    <button id="allbtn">SVE APLIKACIJE</button>
+    <button class="j" id="jbtn">JARVIS</button>
+    <button class="s" id="setbtn">⚙</button>
+  </div>
+</div>
+
+<div class="drawer" id="drawer">
+  <div class="top2"><input id="q" placeholder="Pretraži aplikacije…" autocomplete="off"><button class="x" id="close">✕</button></div>
+  <div class="list"><div class="grid" id="all"></div></div>
+</div>
+
+<div class="menu" id="menu"><div class="box" id="mbox"></div></div>
+
+<script>
+(() => {
+  const H = window.JarvisHome || null;
+  const $ = id => document.getElementById(id);
+  const DAYS = ["NEDELJA", "PONEDELJAK", "UTORAK", "SREDA", "ČETVRTAK", "PETAK", "SUBOTA"];
+  let APPS = [], ICONS = {}, FAV = [];
+  try { ICONS = JSON.parse(localStorage.getItem("home_icons") || "{}"); } catch (e) {}
+  try { FAV = JSON.parse(localStorage.getItem("home_fav") || "null"); } catch (e) {}
+
+  // ---------- clock (like the laptop clock)
+  function tick() {
+    const d = new Date(), p = n => String(n).padStart(2, "0");
+    $("hm").textContent = p(d.getHours()) + ":" + p(d.getMinutes());
+    $("sec").textContent = p(d.getSeconds());
+    $("day").textContent = DAYS[d.getDay()];
+    $("date").textContent = p(d.getDate()) + "." + p(d.getMonth() + 1) + "." + d.getFullYear();
+    const cM = 2 * Math.PI * 41, cS = 2 * Math.PI * 35;
+    $("arcM").setAttribute("stroke-dasharray", `${cM * d.getMinutes() / 60} ${cM}`);
+    $("arcS").setAttribute("stroke-dasharray", `${cS * d.getSeconds() / 60} ${cS}`);
+  }
+  tick(); setInterval(tick, 1000);
+
+  // ---------- hologram animation
+  let frame = 0, last = 0;
+  (function anim(ts) {
+    if (ts - last > 55) { last = ts; frame = (frame + 1) % 60;
+      $("holo").style.backgroundPosition = `${(frame % 10) * 100 / 9}% ${Math.floor(frame / 10) * 100 / 5}%`; }
+    requestAnimationFrame(anim);
+  })(0);
+
+  // ---------- batteries + laptop
+  function stat(id, pct) {
+    const el = $(id), n = parseInt(pct, 10);
+    el.querySelector(".v").textContent = isNaN(n) ? "--" : n + "%";
+    el.querySelector("i").style.width = (isNaN(n) ? 0 : n) + "%";
+    el.classList.toggle("low", !isNaN(n) && n <= 20);
+  }
+  function phone() { if (!H) return; try { const o = JSON.parse(H.battery()); stat("s-phone", o.pct); } catch (e) {} }
+  async function laptop() {
+    const base = localStorage.getItem("kadar_base"), key = localStorage.getItem("kadar_key");
+    if (!base || !key) { const on = H && H.backgroundOn(); $("jst").textContent = on ? "LISTENING" : "TAP TO TALK"; $("jst").className = ""; return; }
+    try {
+      const ctl = new AbortController(); setTimeout(() => ctl.abort(), 5000);
+      const s = await (await fetch(base + "/api/status", { headers: { "X-Kadar-Key": key }, signal: ctl.signal })).json();
+      $("hostst").textContent = "ONLINE"; if (s.host) $("host").textContent = s.host;
+      $("jst").textContent = s.asleep ? "STANDBY" : "ONLINE"; $("jst").className = "";
+      stat("s-laptop", s.laptop && s.laptop.pct);
+      stat("s-hp", s.headphones && s.headphones.pct); stat("s-kb", s.keyboard && s.keyboard.pct);
+    } catch (e) {
+      $("hostst").textContent = "OFFLINE"; $("jst").textContent = H && H.backgroundOn() ? "LISTENING" : "OFFLINE";
+      $("jst").className = H && H.backgroundOn() ? "" : "off";
+    }
+  }
+  phone(); laptop(); setInterval(phone, 30000); setInterval(laptop, 15000);
+
+  // ---------- apps
+  function tile(a, fav) {
+    const d = document.createElement("div"); d.className = "app"; d.dataset.pkg = a.pkg;
+    d.innerHTML = (ICONS[a.pkg] ? `<img src="${ICONS[a.pkg]}">` : `<div class="ph"></div>`) + `<span></span>`;
+    d.querySelector("span").textContent = a.label.toUpperCase();
+    let timer = null, long = false;
+    d.addEventListener("touchstart", () => { long = false; timer = setTimeout(() => { long = true; menuFor(a); }, 550); }, { passive: true });
+    d.addEventListener("touchend", () => clearTimeout(timer));
+    d.addEventListener("touchmove", () => clearTimeout(timer), { passive: true });
+    d.addEventListener("click", () => { if (long) return; if (H) H.launch(a.pkg); closeDrawer(); });
+    d.addEventListener("contextmenu", e => { e.preventDefault(); menuFor(a); });
+    return d;
+  }
+  function byPkg(p) { return APPS.find(a => a.pkg === p); }
+  function renderFav() {
+    const g = $("fav"); g.innerHTML = "";
+    FAV.map(byPkg).filter(Boolean).slice(0, 8).forEach(a => g.appendChild(tile(a, true)));
+  }
+  function renderAll() {
+    const q = $("q").value.trim().toLowerCase(), g = $("all"); g.innerHTML = "";
+    APPS.filter(a => !q || a.label.toLowerCase().includes(q)).forEach(a => g.appendChild(tile(a)));
+  }
+  window.homeIcons = map => {
+    Object.assign(ICONS, map);
+    try { localStorage.setItem("home_icons", JSON.stringify(ICONS)); } catch (e) {}
+    for (const [pkg, src] of Object.entries(map)) document.querySelectorAll(`.app[data-pkg="${pkg}"]`).forEach(el => {
+      const ph = el.querySelector(".ph,img"); if (ph && src) { const img = document.createElement("img"); img.src = src; ph.replaceWith(img); }
+    });
+  };
+  function loadApps() {
+    if (!H) return;
+    try { APPS = JSON.parse(H.apps()); } catch (e) { APPS = []; }
+    if (!FAV) {     // first start: some useful ones
+      const want = ["com.openai.chatgpt", "com.spotify.music", "com.google.android.youtube", "com.instagram.android",
+                    "com.whatsapp", "com.google.android.apps.maps", "com.android.chrome", "com.anthropic.claude",
+                    "com.google.android.gm", "com.google.android.calendar", "com.viber.voip", "com.netflix.mediaclient"];
+      FAV = want.filter(p => byPkg(p)).slice(0, 8);
+      localStorage.setItem("home_fav", JSON.stringify(FAV));
+    }
+    renderFav(); if ($("drawer").classList.contains("open")) renderAll();
+    const missing = APPS.map(a => a.pkg).filter(p => !ICONS[p]);
+    const order = FAV.filter(p => missing.includes(p)).concat(missing.filter(p => !FAV.includes(p)));
+    if (order.length) H.loadIcons(JSON.stringify(order));
+  }
+  loadApps();
+
+  // ---------- long-press menu
+  function menuFor(a) {
+    const isFav = FAV.includes(a.pkg), box = $("mbox");
+    box.innerHTML = `<h3></h3>`; box.querySelector("h3").textContent = a.label.toUpperCase();
+    const btn = (label, fn, cls) => { const b = document.createElement("button"); b.textContent = label; if (cls) b.className = cls;
+      b.onclick = () => { closeMenu(); fn(); }; box.appendChild(b); };
+    btn("Otvori", () => H && H.launch(a.pkg));
+    if (isFav) btn("Ukloni iz prečica", () => { FAV = FAV.filter(p => p !== a.pkg); saveFav(); });
+    else btn(FAV.length >= 8 ? "Dodaj u prečice (zameni poslednju)" : "Dodaj u prečice", () => { if (FAV.length >= 8) FAV.pop(); FAV.push(a.pkg); saveFav(); });
+    if (isFav) btn("Pomeri na početak", () => { FAV = [a.pkg].concat(FAV.filter(p => p !== a.pkg)); saveFav(); });
+    btn("Informacije o aplikaciji", () => H && H.appInfo(a.pkg));
+    btn("Deinstaliraj", () => H && H.uninstall(a.pkg), "d");
+    $("menu").classList.add("open");
+  }
+  function saveFav() { localStorage.setItem("home_fav", JSON.stringify(FAV)); renderFav(); }
+  function closeMenu() { $("menu").classList.remove("open"); }
+  $("menu").onclick = e => { if (e.target.id === "menu") closeMenu(); };
+  function settingsMenu() {
+    const box = $("mbox"); box.innerHTML = "<h3>JARVIS HUD // PODEŠAVANJA</h3>";
+    const btn = (label, fn, cls) => { const b = document.createElement("button"); b.textContent = label; if (cls) b.className = cls;
+      b.onclick = () => { closeMenu(); fn(); }; box.appendChild(b); };
+    btn("Otvori Jarvis", () => H && H.openJarvis());
+    btn("Podešavanja telefona", () => H && H.phoneSettings());
+    btn("Promeni početni ekran (vrati stari)", () => H && H.homeSettings());
+    $("menu").classList.add("open");
+  }
+
+  // ---------- drawer
+  function openDrawer() { $("drawer").classList.add("open"); $("q").value = ""; renderAll(); }
+  function closeDrawer() { $("drawer").classList.remove("open"); $("q").blur(); }
+  $("allbtn").onclick = openDrawer; $("close").onclick = closeDrawer; $("q").oninput = renderAll;
+  $("jbtn").onclick = () => H && H.openJarvis();
+  $("setbtn").onclick = settingsMenu;
+  $("core").onclick = () => H && H.talk();
+  // swipe up anywhere on the home screen = all apps
+  let y0 = null;
+  $("home").addEventListener("touchstart", e => { y0 = e.touches[0].clientY; }, { passive: true });
+  $("home").addEventListener("touchend", e => { if (y0 != null && y0 - e.changedTouches[0].clientY > 90) openDrawer(); y0 = null; });
+
+  window.homeBack = () => { if ($("menu").classList.contains("open")) closeMenu(); else closeDrawer(); };
+  window.homePressed = () => { closeMenu(); closeDrawer(); };
+  window.homeResume = () => { phone(); laptop(); loadApps(); };
+})();
+</script>
+</body>
+</html>
