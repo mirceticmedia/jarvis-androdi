@@ -126,6 +126,10 @@
   .launch button.w{border-left-color:var(--or)} .launch button.d{border-left-color:var(--red);color:#ffb3b3}
   .launch button:active,.row button:active,.seg button:active{background:rgba(0,200,255,.3)}
 
+  .bgrow{display:none;align-items:center;justify-content:space-between;margin:10px 0 0;padding:8px 10px;border:1px solid var(--cyl);background:rgba(0,70,110,.16)}
+  .bgrow span{font-family:Orbitron;font-size:10px;letter-spacing:.16em;color:var(--cy)}
+  .bgrow button{font-family:Orbitron;font-size:10px;letter-spacing:.14em;padding:7px 12px;border:1px solid var(--cyd);background:transparent;color:var(--cyd)}
+  .bgrow button.on{background:rgba(255,145,40,.2);border-color:var(--or);color:#ffd2a0}
   .linkcard{display:none;margin-top:12px;font-size:14px;line-height:1.35;color:#cfe9f5}
   .linkcard p{margin:0 0 6px}
   #linkbtn{cursor:pointer}
@@ -172,6 +176,8 @@
     <p>Say <b>"phone link"</b> to Jarvis on the laptop, then copy the address under the QR code and paste it here.</p>
     <div class="row"><input id="linkin" placeholder="http://192.168.1.100:8765/?k=..." autocomplete="off"><button id="linkok">SAVE</button></div>
   </div>
+
+  <div class="bgrow" id="bgrow"><span>HEY JARVIS // U POZADINI</span><button id="bgbtn">ISKLJUČENO</button></div>
 
   <div class="seg" id="seg"><button data-t="laptop" class="on">LAPTOP</button><button data-t="phone">PHONE</button></div>
 
@@ -534,6 +540,7 @@
       refresh();
     } finally {
       setBusy(false); $("hint").innerHTML = "&nbsp;";
+      if (NATIVE && NATIVE.listenDone && !awaiting) NATIVE.listenDone();
     }
   }
 
@@ -548,6 +555,7 @@
       listening = false; $("core").classList.remove("listen"); $("talk").textContent = "TAP TO TALK";
       if (ev === "final" && text) run(text);
       else { $("hint").innerHTML = "&nbsp;"; if (awaiting) awaiting = false;
+        if (NATIVE.listenDone) NATIVE.listenDone();
         if (text === "network") line("j", "No internet for voice. Turn on offline speech: Settings → Google → Voice → Offline speech recognition → English.");
         if (text === "not-allowed") line("j", "Jarvis needs the microphone. Allow it in the app settings."); }
     }
@@ -592,6 +600,16 @@
   $("linkok").onclick = () => { if (!saveLink($("linkin").value)) line("j", "That doesn't look like the phone link. It should end with ?k=…"); };
   $("linkbtn").onclick = () => { if (IN_APP) { const c = $("linkcard"); c.style.display = c.style.display === "block" ? "none" : "block"; } };
   window.jnResume = () => { refresh(); phoneBattery(); };
+  // "Hey Jarvis" in the background (Android app only)
+  function paintBg(on) { const b = $("bgbtn"); b.textContent = on ? "UKLJUČENO" : "ISKLJUČENO"; b.classList.toggle("on", on); }
+  if (NATIVE && NATIVE.setBackground) {
+    $("bgrow").style.display = "flex"; paintBg(NATIVE.backgroundOn());
+    $("bgbtn").onclick = () => { const on = !NATIVE.backgroundOn(); NATIVE.setBackground(on); paintBg(on);
+      line("j", on ? "Background listening on. Say 'Hey Jarvis' any time." : "Background listening off."); };
+  }
+  window.jnBackground = on => paintBg(on);
+  window.jnNote = what => { if (what === "overlay") line("j", "One more step: allow 'Display over other apps' for Jarvis, so it can pop up when you call it."); };
+  window.jnWake = () => { if (!busy && !listening) listen(); };
   if (IN_APP && !BASE) $("linkcard").style.display = "block";
   if (!IN_APP && "serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("/sw.js").catch(() => {});
   if (!navigator.onLine) line("j", "No internet. Time, battery, timers and opening apps still work; voice needs the keyboard mic in offline mode.");

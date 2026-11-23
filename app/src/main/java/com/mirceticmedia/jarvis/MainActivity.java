@@ -23,6 +23,8 @@ import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
 import android.view.View;
+import android.view.WindowManager;
+import android.provider.Settings;
 import android.webkit.GeolocationPermissions;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -51,7 +53,10 @@ public class MainActivity extends Activity {
     private boolean ttsReady = false;
     private final Handler main = new Handler(Looper.getMainLooper());
     private boolean listenAfterPermission = false;
+    private boolean micFreed = false;
     private GeolocationPermissions.Callback geoCallback;
+    private static final int REQ_BG = 13;
+    private boolean pageReady = false, pendingWake = false, wokeByVoice = false;
     private String geoOrigin;
 
     private boolean has(String perm) {
@@ -91,6 +96,11 @@ public class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 return handleLink(url);
             }
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                pageReady = true;
+                if (pendingWake) { pendingWake = false; js("window.jnWake && jnWake()"); }
+            }
         });
         web.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -117,7 +127,37 @@ public class MainActivity extends Activity {
         });
 
         web.loadUrl("file:///android_asset/index.html");
+        handleWake(getIntent());
     }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleWake(intent);
+    }
+
+    /** opened by "Hey Jarvis" from the background service: show up (even on the lock screen) and listen */
+    private void handleWake(Intent intent) {
+        if (intent == null || !intent.getBooleanExtra("wake", false)) return;
+        intent.removeExtra("wake");
+        wokeByVoice = true;
+        showOnLockScreen(true);
+        if (pageReady) js("window.jnWake && jnWake()");
+        else pendingWake = true;
+    }
+
+    private void showOnLockScreen(boolean on) {
+        if (Build.VERSION.SDK_INT >= 27) {
+            setShowWhenLocked(on);
+            setTurnScreenOn(on);
+        } else {
+            int f = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON;
+            if (on) getWindow().addFlags(f); else getWindow().clearFlags(f);
+        }
+    }
+
+    private boolean backgroundOn() { return JarvisService.prefs(this).getBoolean("background", false); }
 
     private boolean handleLink(String url) {
         if (url.startsWith("file:")) return false;
@@ -164,6 +204,13 @@ public class MainActivity extends Activity {
             return;
         }
         if (tts != null) tts.stop();
+        if (backgroundOn() && !micFreed) {
+            micFreed = true;
+            JarvisService.send(this, JarvisService.PAUSE);
+            main.postDelayed(this::startListening, 250);          // let the service let go of the mic
+            return;
+        }
+        micFreed = false;
         if (recognizer != null) { recognizer.destroy(); recognizer = null; }
         recognizer = SpeechRecognizer.createSpeechRecognizer(this);
         recognizer.setRecognitionListener(new RecognitionListener() {
@@ -211,6 +258,9 @@ public class MainActivity extends Activity {
             if (ok && listenAfterPermission) startListening();
             else if (!ok) js("window.jnSpeech && jnSpeech('error','not-allowed')");
             listenAfterPermission = false;
+        } else if (requestCode == REQ_BG) {
+            if (has(android.Manifest.permission.RECORD_AUDIO)) enableBackground(true);
+            else { JarvisService.prefs(this).edit().putBoolean("background", false).apply(); js("window.jnBackground && jnBackground(false)"); }
         } else if (requestCode == REQ_LOC && geoCallback != null) {
             geoCallback.invoke(geoOrigin, ok, false);
             geoCallback = null;
@@ -319,10 +369,45 @@ public class MainActivity extends Activity {
             else v.vibrate(ms);
         }
 
+        @JavascriptInterface public boolean backgroundOn() { return MainActivity.this.backgroundOn(); }
+
+        @JavascriptInterface public void setBackground(boolean on) { main.post(() -> enableBackground(on)); }
+
+        /** the page finished a command: the wake word service may listen again */
+        @JavascriptInterface public void listenDone() {
+            main.post(() -> {
+                if (backgroundOn()) JarvisService.send(MainActivity.this, JarvisService.RESUME);
+                if (wokeByVoice) {
+                    wokeByVoice = false;
+                    showOnLockScreen(false);
+                    main.postDelayed(() -> moveTaskToBack(true), 1200);   // back to what you were doing
+                }
+            });
+        }
+
         @JavascriptInterface public String version() {
             try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
             catch (Exception e) { return "?"; }
         }
+    }
+
+    private void enableBackground(boolean on) {
+        JarvisService.prefs(this).edit().putBoolean("background", on).apply();
+        if (!on) { JarvisService.send(this, JarvisService.STOP); return; }
+        if (!has(android.Manifest.permission.RECORD_AUDIO)) { ask(android.Manifest.permission.RECORD_AUDIO, REQ_BG); return; }
+        if (Build.VERSION.SDK_INT >= 33 && !has("android.permission.POST_NOTIFICATIONS")) {
+            ask("android.permission.POST_NOTIFICATIONS", REQ_BG);
+            return;
+        }
+        if (!JarvisService.canOpenFromBackground(this)) {
+            // Android only lets Jarvis pop up from the background with "Display over other apps"
+            js("window.jnNote && jnNote('overlay')");
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
+            } catch (Exception ignored) { }
+        }
+        JarvisService.send(this, JarvisService.START);
+        js("window.jnBackground && jnBackground(true)");
     }
 
     @Override
@@ -336,6 +421,7 @@ public class MainActivity extends Activity {
         super.onResume();
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         js("window.jnResume && jnResume()");
+        if (backgroundOn() && has(android.Manifest.permission.RECORD_AUDIO)) JarvisService.send(this, JarvisService.START);
     }
 
     @Override
