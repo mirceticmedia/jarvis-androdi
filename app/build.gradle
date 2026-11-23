@@ -8,7 +8,7 @@ android {
 
     defaultConfig {
         applicationId 'com.mirceticmedia.jarvis'
-        minSdk 26
+        minSdk 21
         targetSdk 34
         versionCode Integer.parseInt(System.getenv("BUILD_NUMBER") ?: "1")
         versionName "1.0." + (System.getenv("BUILD_NUMBER") ?: "1")
@@ -21,6 +21,8 @@ android {
             storePassword System.getenv("JARVIS_KS_PASS") ?: "jarvis-android"
             keyAlias "jarvis"
             keyPassword System.getenv("JARVIS_KS_PASS") ?: "jarvis-android"
+            enableV1Signing true      // older Androids only read the v1 signature
+            enableV2Signing true
         }
     }
     buildTypes {

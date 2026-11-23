@@ -54,6 +54,14 @@ public class MainActivity extends Activity {
     private GeolocationPermissions.Callback geoCallback;
     private String geoOrigin;
 
+    private boolean has(String perm) {
+        return Build.VERSION.SDK_INT < 23 || checkSelfPermission(perm) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void ask(String perm, int code) {
+        if (Build.VERSION.SDK_INT >= 23) requestPermissions(new String[]{perm}, code);
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -76,21 +84,23 @@ public class MainActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                String url = request.getUrl().toString();
-                if (url.startsWith("file:")) return false;
-                openUrlNow(url);
-                return true;
+                return handleLink(request.getUrl().toString());
+            }
+            @SuppressWarnings("deprecation")
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return handleLink(url);
             }
         });
         web.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
-                if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                if (has(Manifest.permission.ACCESS_COARSE_LOCATION)) {
                     callback.invoke(origin, true, false);
                 } else {
                     geoCallback = callback;
                     geoOrigin = origin;
-                    requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, REQ_LOC);
+                    ask(Manifest.permission.ACCESS_COARSE_LOCATION, REQ_LOC);
                 }
             }
         });
@@ -107,6 +117,12 @@ public class MainActivity extends Activity {
         });
 
         web.loadUrl("file:///android_asset/index.html");
+    }
+
+    private boolean handleLink(String url) {
+        if (url.startsWith("file:")) return false;
+        openUrlNow(url);
+        return true;
     }
 
     /** a British male voice if the phone has one, like the laptop's Jarvis */
@@ -138,9 +154,9 @@ public class MainActivity extends Activity {
 
     // ------------------------------------------------------------------ speech recognition (on the phone)
     private void startListening() {
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        if (!has(Manifest.permission.RECORD_AUDIO)) {
             listenAfterPermission = true;
-            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC);
+            ask(Manifest.permission.RECORD_AUDIO, REQ_MIC);
             return;
         }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
@@ -298,7 +314,9 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface public void vibrate(int ms) {
             Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-            if (v != null) v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
+            if (v == null) return;
+            if (Build.VERSION.SDK_INT >= 26) v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
+            else v.vibrate(ms);
         }
 
         @JavascriptInterface public String version() {
