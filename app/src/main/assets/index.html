@@ -478,6 +478,11 @@
       go("Navigate to " + dest, appIntent("www.google.com", "com.google.android.apps.maps", "/maps/dir/?api=1&destination=" + encodeURIComponent(dest)));
       return reply("Navigating to " + dest + "."), true;
     }
+    if (/\blets work\b|\bwork mode\b/.test(t)) {                // on the phone: just ChatGPT
+      if (NATIVE && NATIVE.openApp("com.openai.chatgpt")) return reply("Work mode, sir. Opening ChatGPT."), true;
+      go("Open ChatGPT", appIntent("chatgpt.com", "com.openai.chatgpt"));
+      return reply("Work mode, sir. Opening ChatGPT."), true;
+    }
     if ((m = t.match(/\bcall ([\d ]{5,})/))) { go("Call", "tel:" + m[1].replace(/ /g, "")); return reply("Calling."), true; }
     if ((m = t.match(/\b(?:search|look up|find) (.+?) on youtube\b/)) || (m = t.match(/\byoutube (?:search )?(?:for )?(.+)/))) {
       go("YouTube: " + m[1], appIntent("www.youtube.com", "com.google.android.youtube", "/results?search_query=" + encodeURIComponent(m[1])));
