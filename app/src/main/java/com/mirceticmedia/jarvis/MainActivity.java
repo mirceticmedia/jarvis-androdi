@@ -1,0 +1,330 @@
+package com.mirceticmedia.jarvis;
+
+import android.Manifest;
+import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.BatteryManager;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.provider.AlarmClock;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
+import android.speech.tts.Voice;
+import android.view.View;
+import android.webkit.GeolocationPermissions;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.webkit.WebResourceRequest;
+
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.Locale;
+
+/**
+ * Jarvis for Android: the HUD page runs in a WebView (bundled in the app, works offline),
+ * and this class gives it real phone powers: on-device speech, voice, alarms, timers, opening apps.
+ */
+public class MainActivity extends Activity {
+
+    private static final int REQ_MIC = 11;
+    private static final int REQ_LOC = 12;
+
+    private WebView web;
+    private SpeechRecognizer recognizer;
+    private TextToSpeech tts;
+    private boolean ttsReady = false;
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private boolean listenAfterPermission = false;
+    private GeolocationPermissions.Callback geoCallback;
+    private String geoOrigin;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        web = new WebView(this);
+        web.setBackgroundColor(0xFF050F18);
+        setContentView(web);
+
+        WebSettings s = web.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
+        s.setAllowFileAccess(true);
+        s.setAllowFileAccessFromFileURLs(true);
+        s.setAllowUniversalAccessFromFileURLs(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
+        s.setGeolocationEnabled(true);
+        s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        s.setTextZoom(100);
+
+        web.addJavascriptInterface(new Bridge(), "JarvisNative");
+        web.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                String url = request.getUrl().toString();
+                if (url.startsWith("file:")) return false;
+                openUrlNow(url);
+                return true;
+            }
+        });
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+                if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                    callback.invoke(origin, true, false);
+                } else {
+                    geoCallback = callback;
+                    geoOrigin = origin;
+                    requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, REQ_LOC);
+                }
+            }
+        });
+
+        tts = new TextToSpeech(this, status -> {
+            if (status != TextToSpeech.SUCCESS) return;
+            ttsReady = true;
+            pickVoice();
+            tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override public void onStart(String id) { }
+                @Override public void onDone(String id) { js("window.jnSpoken && jnSpoken(" + JSONObject.quote(id) + ")"); }
+                @Override public void onError(String id) { js("window.jnSpoken && jnSpoken(" + JSONObject.quote(id) + ")"); }
+            });
+        });
+
+        web.loadUrl("file:///android_asset/index.html");
+    }
+
+    /** a British male voice if the phone has one, like the laptop's Jarvis */
+    private void pickVoice() {
+        try {
+            tts.setLanguage(Locale.UK);
+            Voice best = null;
+            int bestScore = -1;
+            for (Voice v : tts.getVoices()) {
+                Locale l = v.getLocale();
+                if (l == null || !"en".equals(l.getLanguage())) continue;
+                String n = v.getName().toLowerCase(Locale.ROOT);
+                int score = 0;
+                if ("GB".equals(l.getCountry())) score += 10;
+                if (n.contains("rjs") || n.contains("gbd") || n.contains("gbb") || n.contains("male") && !n.contains("female")) score += 5;
+                if (!v.isNetworkConnectionRequired()) score += 3;
+                if (v.getQuality() >= Voice.QUALITY_HIGH) score += 1;
+                if (score > bestScore) { bestScore = score; best = v; }
+            }
+            if (best != null) tts.setVoice(best);
+            tts.setPitch(0.9f);
+            tts.setSpeechRate(1.0f);
+        } catch (Exception ignored) { }
+    }
+
+    private void js(final String code) {
+        main.post(() -> { if (web != null) web.evaluateJavascript(code, null); });
+    }
+
+    // ------------------------------------------------------------------ speech recognition (on the phone)
+    private void startListening() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            listenAfterPermission = true;
+            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC);
+            return;
+        }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            js("window.jnSpeech && jnSpeech('error','no-recognizer')");
+            return;
+        }
+        if (tts != null) tts.stop();
+        if (recognizer != null) { recognizer.destroy(); recognizer = null; }
+        recognizer = SpeechRecognizer.createSpeechRecognizer(this);
+        recognizer.setRecognitionListener(new RecognitionListener() {
+            @Override public void onReadyForSpeech(Bundle params) { js("window.jnSpeech && jnSpeech('start','')"); }
+            @Override public void onBeginningOfSpeech() { }
+            @Override public void onRmsChanged(float rmsdB) { }
+            @Override public void onBufferReceived(byte[] buffer) { }
+            @Override public void onEndOfSpeech() { }
+            @Override public void onError(int error) {
+                String e = error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ? "nothing"
+                        : error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ? "not-allowed"
+                        : error == SpeechRecognizer.ERROR_NETWORK || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT ? "network"
+                        : "error-" + error;
+                js("window.jnSpeech && jnSpeech('error'," + JSONObject.quote(e) + ")");
+            }
+            @Override public void onResults(Bundle results) {
+                ArrayList<String> r = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                String text = r != null && !r.isEmpty() ? r.get(0) : "";
+                js("window.jnSpeech && jnSpeech('final'," + JSONObject.quote(text) + ")");
+            }
+            @Override public void onPartialResults(Bundle partial) {
+                ArrayList<String> r = partial.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                if (r != null && !r.isEmpty()) js("window.jnSpeech && jnSpeech('partial'," + JSONObject.quote(r.get(0)) + ")");
+            }
+            @Override public void onEvent(int eventType, Bundle params) { }
+        });
+        Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US");
+        i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+        i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+        i.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);      // works without internet when the offline pack is installed
+        i.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
+        recognizer.startListening(i);
+    }
+
+    private void stopListening() {
+        if (recognizer != null) recognizer.stopListening();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        boolean ok = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        if (requestCode == REQ_MIC) {
+            if (ok && listenAfterPermission) startListening();
+            else if (!ok) js("window.jnSpeech && jnSpeech('error','not-allowed')");
+            listenAfterPermission = false;
+        } else if (requestCode == REQ_LOC && geoCallback != null) {
+            geoCallback.invoke(geoOrigin, ok, false);
+            geoCallback = null;
+        }
+    }
+
+    // ------------------------------------------------------------------ opening things
+    private boolean openUrlNow(String url) {
+        try {
+            Intent intent;
+            if (url.startsWith("intent:")) {
+                intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+                intent.addCategory(Intent.CATEGORY_BROWSABLE);
+                intent.setComponent(null);
+                intent.setSelector(null);
+                try {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                    return true;
+                } catch (ActivityNotFoundException e) {
+                    String fb = intent.getStringExtra("browser_fallback_url");
+                    if (fb != null) { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(fb)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); return true; }
+                    String pkg = intent.getPackage();
+                    if (pkg != null) return openApp(pkg);
+                    return false;
+                }
+            }
+            intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean openApp(String pkg) {
+        try {
+            Intent launch = getPackageManager().getLaunchIntentForPackage(pkg);
+            if (launch == null) return false;
+            launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(launch);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // ------------------------------------------------------------------ what the page can call
+    private class Bridge {
+        @JavascriptInterface public boolean isNative() { return true; }
+
+        @JavascriptInterface public void listen() { main.post(MainActivity.this::startListening); }
+
+        @JavascriptInterface public void stopListen() { main.post(MainActivity.this::stopListening); }
+
+        @JavascriptInterface public void speak(String text, String id) {
+            if (!ttsReady) { js("window.jnSpoken && jnSpoken(" + JSONObject.quote(id) + ")"); return; }
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, id);
+        }
+
+        @JavascriptInterface public void stopSpeaking() { if (ttsReady) tts.stop(); }
+
+        @JavascriptInterface public boolean setAlarm(int hour, int minutes, String label) {
+            Intent i = new Intent(AlarmClock.ACTION_SET_ALARM)
+                    .putExtra(AlarmClock.EXTRA_HOUR, hour)
+                    .putExtra(AlarmClock.EXTRA_MINUTES, minutes)
+                    .putExtra(AlarmClock.EXTRA_MESSAGE, label)
+                    .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try { startActivity(i); return true; } catch (Exception e) { return false; }
+        }
+
+        @JavascriptInterface public boolean setTimer(int seconds, String label) {
+            Intent i = new Intent(AlarmClock.ACTION_SET_TIMER)
+                    .putExtra(AlarmClock.EXTRA_LENGTH, seconds)
+                    .putExtra(AlarmClock.EXTRA_MESSAGE, label)
+                    .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try { startActivity(i); return true; } catch (Exception e) { return false; }
+        }
+
+        @JavascriptInterface public boolean openApp(String pkg) { return MainActivity.this.openApp(pkg); }
+
+        @JavascriptInterface public boolean openUrl(String url) { return openUrlNow(url); }
+
+        @JavascriptInterface public String battery() {
+            try {
+                Intent b = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+                int level = b.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+                int scale = b.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
+                int plugged = b.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0);
+                JSONObject o = new JSONObject();
+                o.put("pct", Math.round(level * 100f / scale));
+                o.put("charging", plugged != 0);
+                return o.toString();
+            } catch (Exception e) {
+                return "{}";
+            }
+        }
+
+        @JavascriptInterface public void vibrate(int ms) {
+            Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            if (v != null) v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
+        }
+
+        @JavascriptInterface public String version() {
+            try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
+            catch (Exception e) { return "?"; }
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (web.canGoBack()) web.goBack();
+        else moveTaskToBack(true);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        js("window.jnResume && jnResume()");
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (recognizer != null) recognizer.destroy();
+        if (tts != null) tts.shutdown();
+        if (web != null) web.destroy();
+        super.onDestroy();
+    }
+}

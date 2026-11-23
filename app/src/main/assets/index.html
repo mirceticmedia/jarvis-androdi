@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#050f18">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>Jarvis</title>
+<style>
+  @font-face{font-family:Orbitron;src:url(fonts/Orbitron.ttf)}
+  @font-face{font-family:Rajdhani;src:url(fonts/Rajdhani-SemiBold.ttf);font-weight:600}
+  @font-face{font-family:Mono;src:url(fonts/ShareTechMono-Regular.ttf)}
+  :root{
+    --bg:#050f18; --cy:#00c8ff; --cy2:#7fe3ff; --cyd:rgba(0,200,255,.55); --cyl:rgba(0,200,255,.22);
+    --or:#ff9128; --red:#ff3b3b; --wh:#e8f6ff; --panel:linear-gradient(90deg,rgba(0,110,160,.28),rgba(0,60,95,.12));
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--wh);font-family:Rajdhani,"Segoe UI",sans-serif;font-weight:600}
+  body{background:
+      radial-gradient(ellipse at 50% 30%,rgba(0,150,230,.20),transparent 60%),
+      linear-gradient(rgba(0,200,255,.05) 1px,transparent 1px) 0 0/34px 34px,
+      linear-gradient(90deg,rgba(0,200,255,.05) 1px,transparent 1px) 0 0/34px 34px,var(--bg);
+    background-attachment:fixed}
+  .mono{font-family:Mono,monospace}
+  .app{position:relative;min-height:100%;padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 18px);overflow-x:hidden}
+
+  /* frame: corner brackets + side ticks, like the laptop */
+  .frame{position:fixed;inset:calc(env(safe-area-inset-top) + 6px) 6px calc(env(safe-area-inset-bottom) + 6px);pointer-events:none;z-index:0}
+  .frame i{position:absolute;width:34px;height:34px;border:2px solid var(--cyd)}
+  .frame .a{left:0;top:0;border-right:0;border-bottom:0}.frame .b{right:0;top:0;border-left:0;border-bottom:0}
+  .frame .c{left:0;bottom:0;border-right:0;border-top:0}.frame .d{right:0;bottom:0;border-left:0;border-top:0}
+  .frame .l,.frame .r{width:3px;height:70px;border:0;background:var(--or);top:45%;opacity:.8}
+  .frame .l{left:-2px}.frame .r{right:-2px}
+  .app>*{position:relative;z-index:1}
+
+  header{text-align:center}
+  .meta{display:flex;justify-content:space-between;font-size:9px;letter-spacing:.14em;color:var(--cyd);font-family:Mono,monospace}
+  .meta b{display:block;font-family:Rajdhani;font-size:13px;color:var(--cy);letter-spacing:.06em;margin-top:1px}
+  .meta div:last-child{text-align:right}
+  .title{font-family:Orbitron;font-size:23px;letter-spacing:.16em;color:var(--wh);margin:6px 0 0;text-shadow:0 0 14px rgba(0,200,255,.45)}
+  .title+.bar{width:38px;height:3px;background:var(--or);margin:5px auto 6px}
+  .cam{font-family:Mono;font-size:10px;letter-spacing:.12em;color:var(--cyd);border-bottom:1px solid var(--cyl);padding-bottom:7px;white-space:nowrap;overflow:hidden}
+
+  /* core: the hologram is the talk button */
+  .core{position:relative;width:min(92vw,370px);aspect-ratio:1;margin:8px auto 0}
+  .core svg.rings{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .spin{transform-origin:50% 50%;animation:spin 40s linear infinite}
+  .spin2{transform-origin:50% 50%;animation:spin 22s linear infinite reverse}
+  .spin3{transform-origin:50% 50%;animation:spin 70s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .holo{position:absolute;left:50%;top:48%;width:70%;aspect-ratio:1;transform:translate(-50%,-50%);
+    background:url(cam.webp) 0 0/1000% 600% no-repeat;filter:drop-shadow(0 0 10px rgba(0,190,255,.55))}
+  .glow{position:absolute;left:50%;top:50%;width:58%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+    background:radial-gradient(circle,rgba(0,150,255,.30),rgba(0,90,160,.08) 55%,transparent 70%)}
+  .rec{position:absolute;left:0;top:2%;font-family:Mono;font-size:15px;color:var(--wh);line-height:1.15}
+  .rec .r{font-family:Rajdhani;font-size:15px;color:var(--red);letter-spacing:.06em}
+  .rec .r:before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red);margin-right:6px;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:.15}}
+  .rec small{display:block;font-size:8px;letter-spacing:.14em;color:var(--cyd)}
+  .jstate{position:absolute;right:0;top:3%;font-family:Orbitron;font-size:10px;letter-spacing:.18em;color:var(--cy);text-align:right}
+  .jstate b{font-weight:400;color:#3dffa8}.jstate b.off{color:var(--red)}.jstate b.sb{color:var(--or)}
+  .clabel{position:absolute;left:0;right:0;bottom:22%;text-align:center;font-family:Mono;font-size:10px;letter-spacing:.16em;color:var(--cyd);pointer-events:none}
+  .talk{position:absolute;left:0;right:0;bottom:16.5%;text-align:center;font-family:Orbitron;font-size:10px;letter-spacing:.3em;color:var(--cy2);pointer-events:none}
+  .core.listen .ringc{stroke:var(--or)} .core.listen .talk{color:var(--or)}
+  .core.listen .holo{filter:drop-shadow(0 0 14px rgba(255,145,40,.8)) hue-rotate(160deg) saturate(1.6)}
+  .core.busy .holo{opacity:.6}
+  .np{text-align:center;font-family:Mono;font-size:10px;letter-spacing:.14em;color:var(--or);min-height:14px;margin-top:-4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .heard{text-align:center;font-family:Mono;font-size:11px;color:var(--cy2);min-height:15px;letter-spacing:.06em}
+
+  /* section titles: "SYSTEM // DIAGNOSTIKA" with orange underline and end dot */
+  .sec{margin-top:16px}
+  .sh{position:relative;font-family:Orbitron;font-size:12px;letter-spacing:.2em;color:var(--cy);padding-bottom:6px;border-bottom:1px solid var(--cyl);margin-bottom:9px}
+  .sh:before{content:"";position:absolute;left:0;bottom:-3px;width:34px;height:3px;background:var(--or)}
+  .sh:after{content:"";position:absolute;right:0;bottom:-3px;width:5px;height:5px;background:var(--cy)}
+
+  .seg{display:flex;justify-content:center;gap:0;margin:8px auto 0;width:max-content;border:1px solid var(--cyl)}
+  .seg button{background:transparent;border:0;color:var(--cyd);font-family:Orbitron;font-size:10px;letter-spacing:.2em;padding:8px 16px}
+  .seg button.on{background:rgba(0,200,255,.18);color:var(--wh);box-shadow:inset 0 -2px 0 var(--cy)}
+
+  .log{height:112px;overflow-y:auto;background:rgba(0,70,110,.16);border:1px solid var(--cyl);padding:8px 10px;font-size:15px;line-height:1.32}
+  .log .u{color:#8fb8c9} .log .u:before{content:"YOU › ";font-family:Mono;font-size:10px;color:var(--cyd)}
+  .log .j{color:var(--wh)} .log .j:before{content:"JARVIS › ";font-family:Mono;font-size:10px;color:var(--or)}
+  .log a.act{display:inline-block;margin:4px 0 2px;padding:6px 10px;border:1px solid var(--or);color:var(--or);text-decoration:none;font-family:Orbitron;font-size:10px;letter-spacing:.14em}
+  .row{display:flex;gap:6px;margin-top:6px}
+  .row input{flex:1;min-width:0;background:rgba(0,70,110,.16);border:1px solid var(--cyl);color:var(--wh);font:inherit;font-size:15px;padding:9px 10px;outline:none;border-radius:0}
+  .row button{background:rgba(0,200,255,.16);border:1px solid var(--cyd);color:var(--wh);font-family:Orbitron;font-size:10px;letter-spacing:.16em;padding:0 14px}
+  .setup{display:none;margin-top:8px;font-size:13px;color:#ffc98c;background:rgba(255,145,40,.08);border:1px solid rgba(255,145,40,.35);padding:8px 10px;line-height:1.35}
+  .setup code{color:#fff;word-break:break-all;font-family:Mono;font-size:11px}
+
+  /* gauges */
+  .gauges{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;text-align:center}
+  .g{position:relative;aspect-ratio:1}
+  .g svg{width:100%;height:100%;transform:rotate(-90deg)}
+  .g .v{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Orbitron;font-size:19px}
+  .g .v small{font-family:Mono;font-size:8px;color:var(--cyd);letter-spacing:.06em;margin-top:2px}
+  .gauges .k{font-family:Orbitron;font-size:10px;letter-spacing:.18em;color:var(--or);margin-top:-6px}
+
+  /* battery */
+  .batt{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+  .cell{position:relative;width:118px;height:42px;border:2px solid var(--cy);padding:4px;flex-shrink:0}
+  .cell:after{content:"";position:absolute;right:-7px;top:12px;width:5px;height:14px;background:var(--cy)}
+  .cell i{display:block;height:100%;background:linear-gradient(90deg,#00b4f0,#36d2ff);width:0;transition:width .6s}
+  .cell.low i{background:var(--or)}
+  .batt .n{font-family:Orbitron;font-size:26px}
+  .batt .t{font-family:Mono;font-size:9px;letter-spacing:.12em;color:var(--cyd)}
+
+  /* peripherals */
+  .per{display:flex;gap:12px;align-items:center;margin-bottom:9px}
+  .per .ph{width:66px;height:66px;flex-shrink:0;border:1px solid var(--cyl);background:rgba(0,80,120,.18) center/86% no-repeat;position:relative}
+  .per .ph:after{content:"";position:absolute;left:-1px;bottom:-1px;width:14px;height:3px;background:var(--or)}
+  .per .info{flex:1}
+  .per .top{display:flex;justify-content:space-between;align-items:baseline}
+  .per .nm{font-size:16px;letter-spacing:.04em}
+  .per .pc{font-family:Orbitron;font-size:22px}
+  .per .track{height:5px;background:rgba(0,200,255,.14);margin:5px 0 4px}
+  .per .track i{display:block;height:100%;background:var(--cy);width:0;transition:width .6s}
+  .per .st{font-family:Mono;font-size:9px;letter-spacing:.12em;color:var(--cyd)}
+
+  /* launch list like "PRECICE // LAUNCH" */
+  .launch{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .launch button{position:relative;text-align:left;background:var(--panel);border:1px solid var(--cyl);border-left:3px solid var(--cy);
+    color:var(--wh);font-family:Rajdhani;font-weight:600;font-size:14px;letter-spacing:.06em;padding:10px 26px 10px 10px;
+    clip-path:polygon(0 0,calc(100% - 9px) 0,100% 9px,100% 100%,0 100%)}
+  .launch button span{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-family:Mono;font-size:9px;color:var(--cyd)}
+  .launch button.w{border-left-color:var(--or)} .launch button.d{border-left-color:var(--red);color:#ffb3b3}
+  .launch button:active,.row button:active,.seg button:active{background:rgba(0,200,255,.3)}
+
+  .linkcard{display:none;margin-top:12px;font-size:14px;line-height:1.35;color:#cfe9f5}
+  .linkcard p{margin:0 0 6px}
+  #linkbtn{cursor:pointer}
+  footer{display:flex;justify-content:space-between;margin-top:18px;font-family:Mono;font-size:9px;letter-spacing:.12em;color:rgba(0,200,255,.4)}
+  .ruler{height:10px;margin-top:10px;background:repeating-linear-gradient(90deg,rgba(0,200,255,.35) 0 1px,transparent 1px 12px);border-bottom:1px solid rgba(0,200,255,.35);position:relative}
+  .ruler:after{content:"";position:absolute;left:50%;bottom:-1px;transform:translateX(-50%);border:6px solid transparent;border-bottom-color:var(--or);border-top:0}
+</style>
+</head>
+<body>
+<div class="frame"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="l"></i><i class="r"></i></div>
+<div class="app">
+  <header>
+    <div class="meta">
+      <div>OPERATOR<b>MOBILE</b></div>
+      <div id="linkbtn">HOST / <span id="hostst">OFFLINE</span><b id="host">LAPTOP</b></div>
+    </div>
+    <div class="title">MIRCETICMEDIA</div><div class="bar"></div>
+    <div class="cam">STBY / 4K UHD / 25.00P / F2.8 / ISO 400 / 5600K / ND OFF</div>
+  </header>
+
+  <div class="core" id="core" role="button" aria-label="Talk to Jarvis">
+    <svg class="rings" viewBox="0 0 400 400">
+      <circle cx="200" cy="200" r="196" fill="none" stroke="rgba(0,200,255,.18)" stroke-width="1"/>
+      <g class="spin3"><circle cx="200" cy="200" r="186" fill="none" stroke="rgba(0,200,255,.45)" stroke-width="7" stroke-dasharray="1.2 7.5"/></g>
+      <g class="spin"><circle class="ringc" cx="200" cy="200" r="172" fill="none" stroke="#00c8ff" stroke-width="3.2" stroke-dasharray="26 12" opacity=".75"/></g>
+      <g class="spin2">
+        <circle cx="200" cy="200" r="158" fill="none" stroke="#ff9128" stroke-width="3" stroke-dasharray="90 160 40 210 70 380" opacity=".9"/>
+      </g>
+      <circle cx="200" cy="200" r="146" fill="none" stroke="rgba(0,200,255,.30)" stroke-width="1.2"/>
+      <circle cx="200" cy="200" r="139" fill="none" stroke="rgba(0,200,255,.14)" stroke-width="1"/>
+    </svg>
+    <div class="glow"></div>
+    <div class="holo" id="holo"></div>
+    <div class="rec"><span class="r">REC</span><br><span id="uptime">00:00:00</span><small>SYSTEM UPTIME</small></div>
+    <div class="jstate">JARVIS //<br><b id="st" class="off">OFFLINE</b></div>
+    <div class="clabel">XA55 / 4K UHD 25P</div>
+    <div class="talk" id="talk">TAP TO TALK</div>
+  </div>
+  <div class="np" id="np"></div>
+  <div class="heard" id="hint">&nbsp;</div>
+
+  <div class="linkcard" id="linkcard">
+    <div class="sh">LAPTOP // LINK</div>
+    <p>Say <b>"phone link"</b> to Jarvis on the laptop, then copy the address under the QR code and paste it here.</p>
+    <div class="row"><input id="linkin" placeholder="http://192.168.1.100:8765/?k=..." autocomplete="off"><button id="linkok">SAVE</button></div>
+  </div>
+
+  <div class="seg" id="seg"><button data-t="laptop" class="on">LAPTOP</button><button data-t="phone">PHONE</button></div>
+
+  <div class="sec">
+    <div class="sh">JARVIS // KOMANDE</div>
+    <div class="log" id="log"></div>
+    <div class="setup" id="setup"></div>
+    <div class="row">
+      <input id="txt" placeholder="Type or use the keyboard mic…" enterkeyhint="send" autocomplete="off">
+      <button id="send">SEND</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sh">PRECICE // LAUNCH</div>
+    <div class="launch">
+      <button class="w" data-c="let's work">LET'S WORK<span>01</span></button>
+      <button class="w" data-c="chill mode">CHILL MODE<span>02</span></button>
+      <button data-c="pause">PLAY / PAUSE<span>03</span></button>
+      <button data-c="next">NEXT SONG<span>04</span></button>
+      <button data-c="volume down">VOLUME −<span>05</span></button>
+      <button data-c="volume up">VOLUME +<span>06</span></button>
+      <button data-c="switch to headphones">SLUŠALICE<span>07</span></button>
+      <button data-c="switch to speakers">ZVUČNICI<span>08</span></button>
+      <button data-c="what song is this">WHAT SONG<span>09</span></button>
+      <button data-c="take a screenshot">SCREENSHOT<span>10</span></button>
+      <button data-c="lock the computer">LOCK<span>11</span></button>
+      <button class="d" data-c="shut down computer">SHUT DOWN<span>12</span></button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sh">SYSTEM // DIAGNOSTIKA</div>
+    <div class="gauges">
+      <div><div class="g" id="g-cpu"></div><div class="k">CPU</div></div>
+      <div><div class="g" id="g-ram"></div><div class="k">RAM</div></div>
+      <div><div class="g" id="g-disk"></div><div class="k">DISK C</div></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sh">NAPAJANJE // BATT</div>
+    <div class="batt"><div class="cell" id="c-laptop"><i></i></div><div><div class="n" id="b-laptop">--</div><div class="t" id="t-laptop">LAPTOP</div></div></div>
+    <div class="batt"><div class="cell" id="c-phone"><i></i></div><div><div class="n" id="b-phone">--</div><div class="t" id="t-phone">TELEFON</div></div></div>
+  </div>
+
+  <div class="sec">
+    <div class="sh">PERIFERIJA // BT</div>
+    <div class="per"><div class="ph" style="background-image:url(kb.webp)"></div>
+      <div class="info"><div class="top"><span class="nm">PEBBLE KEYS 2</span><span class="pc" id="b-kb">--</span></div>
+      <div class="track"><i id="k-kb"></i></div><div class="st" id="s-kb">--</div></div></div>
+    <div class="per"><div class="ph" style="background-image:url(hp.webp)"></div>
+      <div class="info"><div class="top"><span class="nm">SONY</span><span class="pc" id="b-hp">--</span></div>
+      <div class="track"><i id="k-hp"></i></div><div class="st" id="s-hp">--</div></div></div>
+  </div>
+
+  <div class="ruler"></div>
+  <footer><span>SAFE AREA 90% / 9:16</span><span id="outl">UHD 2160x3840 / 25P</span></footer>
+</div>
+
+<script>
+(() => {
+  const NATIVE = window.JarvisNative || null;              // running inside the Android app
+  const IN_APP = location.protocol === "file:";
+  const qs = new URLSearchParams(location.search);
+  if (qs.get("k")) { localStorage.setItem("kadar_key", qs.get("k")); history.replaceState(null, "", "/"); }
+  let KEY = localStorage.getItem("kadar_key") || "";
+  let BASE = IN_APP ? (localStorage.getItem("kadar_base") || "") : "";   // the app talks to the laptop by address
+  const $ = id => document.getElementById(id);
+  function saveLink(text) {
+    try {
+      const u = new URL(text.trim());
+      const k = u.searchParams.get("k");
+      if (!k) throw new Error("no key");
+      BASE = u.origin; KEY = k;
+      localStorage.setItem("kadar_base", BASE); localStorage.setItem("kadar_key", KEY);
+      $("linkcard").style.display = "none"; refresh(); return true;
+    } catch (e) { return false; }
+  }
+  let target = localStorage.getItem("kadar_target") || "laptop";
+  let laptopOnline = false, awaiting = false, busy = false;
+
+  // ---------- rotating hologram (same frames as the laptop HUD)
+  let frame = 0, lastF = 0;
+  function animate(ts) {
+    if (ts - lastF > 55) { lastF = ts; frame = (frame + 1) % 60;
+      $("holo").style.backgroundPosition = `${(frame % 10) * 100 / 9}% ${Math.floor(frame / 10) * 100 / 5}%`; }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+
+  // ---------- gauges
+  function gauge(id, pct, sub) {
+    const r = 42, c = 2 * Math.PI * r, p = Math.max(0, Math.min(100, pct || 0));
+    $(id).innerHTML =
+      `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="47" fill="none" stroke="rgba(0,200,255,.35)" stroke-width="3" stroke-dasharray="0.6 3.2"/>` +
+      `<circle cx="50" cy="50" r="${r}" fill="none" stroke="rgba(0,200,255,.14)" stroke-width="6"/>` +
+      `<circle cx="50" cy="50" r="${r}" fill="none" stroke="${p > 85 ? "#ff9128" : "#00c8ff"}" stroke-width="6" stroke-dasharray="${c * p / 100} ${c}"/>` +
+      `<circle cx="50" cy="50" r="33" fill="rgba(0,150,220,.08)" stroke="rgba(0,200,255,.25)" stroke-width="1"/></svg>` +
+      `<div class="v">${pct == null ? "--" : Math.round(p) + "%"}<small>${sub || ""}</small></div>`;
+  }
+  gauge("g-cpu"); gauge("g-ram"); gauge("g-disk");
+
+  // ---------- log + voice
+  function line(cls, text) {
+    const d = document.createElement("div"); d.className = cls; d.textContent = text;
+    $("log").appendChild(d); $("log").scrollTop = 1e9; return d;
+  }
+  function actionLink(label, url) {
+    const a = document.createElement("a"); a.className = "act"; a.href = url; a.textContent = "▶ " + label.toUpperCase();
+    const d = document.createElement("div"); d.appendChild(a); $("log").appendChild(d); $("log").scrollTop = 1e9;
+  }
+  let VOICE = null;
+  function pickVoice() {
+    const vs = speechSynthesis.getVoices();
+    VOICE = vs.find(v => /en.GB/i.test(v.lang) && /male/i.test(v.name) && !/female/i.test(v.name))
+         || vs.find(v => /en.GB/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)) || null;
+  }
+  if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+  const spoken = {};
+  window.jnSpoken = id => { if (spoken[id]) { spoken[id](); delete spoken[id]; } };
+  function speak(text) {
+    return new Promise(res => {
+      if (NATIVE) {
+        const id = "u" + Date.now() + Math.random();
+        spoken[id] = res; NATIVE.speak(text, id); setTimeout(() => window.jnSpoken(id), 15000); return;
+      }
+      if (!("speechSynthesis" in window)) return res();
+      const u = new SpeechSynthesisUtterance(text);
+      if (VOICE) u.voice = VOICE; u.lang = VOICE ? VOICE.lang : "en-GB"; u.rate = 1.02; u.pitch = 0.9;
+      u.onend = u.onerror = () => res();
+      speechSynthesis.cancel(); speechSynthesis.speak(u);
+      setTimeout(res, 12000);
+    });
+  }
+  async function reply(text) { line("j", text); await speak(text); }
+
+  // ---------- laptop link
+  async function api(path, body) {
+    const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), body ? 40000 : 6000);
+    try {
+      if (IN_APP && !BASE) throw new Error("nolink");
+      const r = await fetch(BASE + path, { method: body ? "POST" : "GET", signal: ctl.signal,
+        headers: { "X-Kadar-Key": KEY, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+      if (r.status === 401) throw new Error("key");
+      return await r.json();
+    } finally { clearTimeout(to); }
+  }
+  function num(v) { const n = parseInt(String(v), 10); return isNaN(n) ? null : n; }
+  function setBatt(id, pct, label) {
+    const n = num(pct); $("b-" + id).textContent = n == null ? "--" : n + "%";
+    const c = $("c-" + id); c.querySelector("i").style.width = (n || 0) + "%"; c.classList.toggle("low", n != null && n <= 20);
+    if (label) $("t-" + id).textContent = label;
+  }
+  function setPer(id, pct, status) {
+    const n = num(pct); $("b-" + id).textContent = n == null ? "--" : n + "%";
+    $("k-" + id).style.width = (n || 0) + "%";
+    $("s-" + id).textContent = status ? String(status).toUpperCase() : "--";
+  }
+  let uptime = null;
+  setInterval(() => {
+    if (uptime == null) return; uptime++;
+    const h = Math.floor(uptime / 3600), m = Math.floor(uptime % 3600 / 60), s = uptime % 60;
+    $("uptime").textContent = [h, m, s].map(x => String(x).padStart(2, "0")).join(":");
+  }, 1000);
+  async function refresh() {
+    try {
+      const s = await api("/api/status");
+      laptopOnline = true;
+      $("st").textContent = s.asleep ? "STANDBY" : "ONLINE"; $("st").className = s.asleep ? "sb" : "";
+      $("hostst").textContent = "ONLINE"; if (s.host) $("host").textContent = s.host;
+      if (s.uptime != null) uptime = s.uptime;
+      gauge("g-cpu", s.cpu);
+      gauge("g-ram", s.ram && s.ram.pct, s.ram ? `${s.ram.used} GB / ${s.ram.total} GB` : "");
+      gauge("g-disk", s.disk && s.disk.pct, s.disk ? `${s.disk.used} GB / ${s.disk.total} GB` : "");
+      setBatt("laptop", s.laptop && s.laptop.pct, s.laptop ? (s.laptop.plugged ? "LAPTOP / PUNI SE" : "LAPTOP / BATERIJA") : "LAPTOP");
+      setPer("kb", s.keyboard && s.keyboard.pct, s.keyboard && s.keyboard.status);
+      setPer("hp", s.headphones && s.headphones.pct, s.headphones && s.headphones.status);
+      $("np").textContent = s.now_playing ? "♪ " + s.now_playing.toUpperCase() : "";
+      $("outl").textContent = (s.output ? "AUDIO / " + s.output.toUpperCase() : "AUDIO / --") + (s.volume != null ? "  VOL " + s.volume : "");
+    } catch (e) {
+      laptopOnline = false; $("st").textContent = e.message === "key" ? "WRONG LINK" : e.message === "nolink" ? "NO LINK" : "OFFLINE"; $("st").className = "off";
+      if (IN_APP && (e.message === "nolink" || e.message === "key")) $("linkcard").style.display = "block";
+      $("hostst").textContent = "OFFLINE";
+    }
+  }
+  async function phoneBattery() {
+    if (NATIVE) {
+      try { const o = JSON.parse(NATIVE.battery()); setBatt("phone", o.pct, o.charging ? "TELEFON / PUNI SE" : "TELEFON");
+        return { level: o.pct / 100, charging: o.charging }; } catch (e) { return null; }
+    }
+    try { const b = await navigator.getBattery();
+      const f = () => setBatt("phone", Math.round(b.level * 100), b.charging ? "TELEFON / PUNI SE" : "TELEFON");
+      f(); b.onlevelchange = f; b.onchargingchange = f; return b; } catch (e) { return null; }
+  }
+  phoneBattery(); refresh(); setInterval(refresh, 10000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+
+  // ---------- phone-only commands
+  const APPS = {
+    "spotify": ["open.spotify.com", "com.spotify.music"], "youtube music": ["music.youtube.com", "com.google.android.apps.youtube.music"],
+    "youtube": ["www.youtube.com", "com.google.android.youtube"], "instagram": ["www.instagram.com", "com.instagram.android"],
+    "whatsapp": ["web.whatsapp.com", "com.whatsapp"], "maps": ["www.google.com/maps", "com.google.android.apps.maps"],
+    "google maps": ["www.google.com/maps", "com.google.android.apps.maps"], "gmail": ["mail.google.com/mail", "com.google.android.gm"],
+    "mail": ["mail.google.com/mail", "com.google.android.gm"], "calendar": ["calendar.google.com", "com.google.android.calendar"],
+    "netflix": ["www.netflix.com", "com.netflix.mediaclient"], "chatgpt": ["chatgpt.com", "com.openai.chatgpt"],
+    "chat gpt": ["chatgpt.com", "com.openai.chatgpt"], "claude": ["claude.ai", "com.anthropic.claude"],
+    "tiktok": ["www.tiktok.com", "com.zhiliaoapp.musically"], "tik tok": ["www.tiktok.com", "com.zhiliaoapp.musically"],
+    "drive": ["drive.google.com", "com.google.android.apps.docs"], "google drive": ["drive.google.com", "com.google.android.apps.docs"],
+    "photos": ["photos.google.com", "com.google.android.apps.photos"], "facebook": ["www.facebook.com", "com.facebook.katana"],
+    "linkedin": ["www.linkedin.com", "com.linkedin.android"], "premiere rush": ["", "com.adobe.premiererush.videoeditor"],
+  };
+  const appIntent = (host, pkg, path = "") =>
+    `intent://${host}${path}#Intent;scheme=https;package=${pkg};S.browser_fallback_url=${encodeURIComponent("https://" + host + path)};end`;
+  function go(label, url) {
+    actionLink(label, url);
+    if (NATIVE) { NATIVE.openUrl(url); return; }
+    try { location.href = url; } catch (e) {}
+  }
+  const WMO = {0:"clear",1:"mostly clear",2:"partly cloudy",3:"cloudy",45:"foggy",48:"foggy",51:"light drizzle",53:"drizzle",55:"heavy drizzle",
+    61:"light rain",63:"rain",65:"heavy rain",71:"light snow",73:"snow",75:"heavy snow",77:"snow grains",80:"rain showers",81:"rain showers",
+    82:"heavy showers",85:"snow showers",86:"heavy snow showers",95:"a thunderstorm",96:"a thunderstorm with hail",99:"a thunderstorm with hail"};
+  function where() {
+    return new Promise(res => {
+      if (!navigator.geolocation) return res(null);
+      navigator.geolocation.getCurrentPosition(p => res([p.coords.latitude, p.coords.longitude]), () => res(null), { timeout: 6000, maximumAge: 600000 });
+    });
+  }
+  async function weather() {
+    const pos = (await where()) || [44.787, 20.457];
+    const u = `https://api.open-meteo.com/v1/forecast?latitude=${pos[0]}&longitude=${pos[1]}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=1`;
+    const d = await (await fetch(u)).json();
+    const c = d.current, dl = d.daily;
+    let s = `It's ${Math.round(c.temperature_2m)} degrees and ${WMO[c.weather_code] || "changing"}. Today between ${Math.round(dl.temperature_2m_min[0])} and ${Math.round(dl.temperature_2m_max[0])}.`;
+    if (dl.precipitation_probability_max[0] >= 40) s += ` ${dl.precipitation_probability_max[0]} percent chance of rain, take an umbrella.`;
+    return s;
+  }
+  let timerId = null;
+  function startTimer(sec, label) {
+    clearTimeout(timerId);
+    timerId = setTimeout(async () => {
+      if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
+      try { if (Notification.permission === "granted") new Notification("Jarvis", { body: label }); } catch (e) {}
+      await reply(label);
+    }, sec * 1000);
+  }
+  function parseDuration(t) {
+    let sec = 0, m;
+    if ((m = t.match(/(\d+|an?|one|half an?) hours?/))) sec += (/half/.test(m[1]) ? 0.5 : /^(a|an|one)$/.test(m[1]) ? 1 : +m[1]) * 3600;
+    if ((m = t.match(/(\d+|a|one) minutes?/))) sec += (/^(a|one)$/.test(m[1]) ? 1 : +m[1]) * 60;
+    if ((m = t.match(/(\d+) seconds?/))) sec += +m[1];
+    if (/half an hour/.test(t) && sec === 0) sec = 1800;
+    return sec;
+  }
+  const PHONE_ONLY = /\b(alarm|wake me|timer|navigate|directions|take me to|route to|my phone|phone battery|call \d|dial)\b/;
+
+  async function phoneLocal(t) {
+    let m;
+    if (/\b(what time|the time|time is it)\b/.test(t)) {
+      return reply("It's " + new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) + "."), true;
+    }
+    if (/\b(what day|the date|what date|today s date|todays date)\b/.test(t)) {
+      return reply("Today is " + new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }) + "."), true;
+    }
+    if (/\b(battery|charge)\b/.test(t)) {
+      const b = await phoneBattery();
+      return reply(b ? `Your phone is at ${Math.round(b.level * 100)} percent${b.charging ? " and charging" : ""}.` : "I can't read the phone battery."), true;
+    }
+    if (/\b(weather|temperature|how cold|how hot|rain today|umbrella)\b/.test(t)) {
+      try { await reply(await weather()); } catch (e) { await reply("I can't get the weather right now."); }
+      return true;
+    }
+    if (/\b(alarm|wake me)\b/.test(t)) {
+      m = t.match(/(\d{1,2})(?:[: ](\d{2}))?\s*(am|pm|a m|p m)?/);
+      if (!m) return reply("For what time?"), true;
+      let h = +m[1], mi = +(m[2] || 0); const ap = (m[3] || "").replace(" ", "");
+      if (ap === "pm" && h < 12) h += 12; if (ap === "am" && h === 12) h = 0;
+      const hh = String(h).padStart(2, "0") + ":" + String(mi).padStart(2, "0");
+      if (NATIVE) { return reply(NATIVE.setAlarm(h, mi, "Jarvis") ? "Alarm set for " + hh + "." : "I couldn't reach the clock app."), true; }
+      go("Set alarm " + hh, `intent:#Intent;action=android.intent.action.SET_ALARM;i.android.intent.extra.alarm.HOUR=${h};i.android.intent.extra.alarm.MINUTES=${mi};S.android.intent.extra.alarm.MESSAGE=Jarvis;end`);
+      return reply("Setting an alarm for " + hh + "."), true;
+    }
+    if (/\btimer\b/.test(t)) {
+      const sec = parseDuration(t);
+      if (!sec) return reply("For how long?"), true;
+      if (NATIVE && NATIVE.setTimer(Math.round(sec), "Jarvis")) {
+        const mn = Math.round(sec / 60);
+        return reply(sec < 60 ? `Timer set for ${sec} seconds.` : `Timer set for ${mn} minute${mn === 1 ? "" : "s"}.`), true;
+      }
+      try { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
+      startTimer(sec, "Time's up.");
+      const mins = Math.round(sec / 60);
+      return reply(sec < 60 ? `Timer set for ${sec} seconds.` : `Timer set for ${mins} minute${mins === 1 ? "" : "s"}. Keep this page open.`), true;
+    }
+    if ((m = t.match(/\b(?:navigate|directions|take me|route) (?:to )?(.+)/))) {
+      const dest = m[1].replace(/\b(please|on my phone)\b/g, "").trim();
+      go("Navigate to " + dest, appIntent("www.google.com", "com.google.android.apps.maps", "/maps/dir/?api=1&destination=" + encodeURIComponent(dest)));
+      return reply("Navigating to " + dest + "."), true;
+    }
+    if ((m = t.match(/\bcall ([\d ]{5,})/))) { go("Call", "tel:" + m[1].replace(/ /g, "")); return reply("Calling."), true; }
+    if ((m = t.match(/\b(?:search|look up|find) (.+?) on youtube\b/)) || (m = t.match(/\byoutube (?:search )?(?:for )?(.+)/))) {
+      go("YouTube: " + m[1], appIntent("www.youtube.com", "com.google.android.youtube", "/results?search_query=" + encodeURIComponent(m[1])));
+      return reply("Searching YouTube for " + m[1] + "."), true;
+    }
+    if ((m = t.match(/^(?:play|put on) (.+?)(?: on spotify)?$/))) {
+      go("Spotify: " + m[1], "spotify:search:" + encodeURIComponent(m[1]));
+      return reply("Opening " + m[1] + " on Spotify."), true;
+    }
+    if ((m = t.match(/\b(?:open|launch|start|show me|go to) (.+)/))) {
+      const name = m[1].replace(/\b(the|app|application|please)\b/g, "").trim();
+      const key = Object.keys(APPS).sort((a, b) => b.length - a.length).find(k => name.includes(k));
+      if (key) {
+        const [host, pkg] = APPS[key];
+        if (NATIVE && NATIVE.openApp(pkg)) return reply("Opening " + key + "."), true;
+        const own = { "spotify": "spotify:", "youtube music": "intent://music.youtube.com/#Intent;scheme=https;package=com.google.android.apps.youtube.music;end" };
+        go("Open " + key, own[key] || (host ? appIntent(host, pkg) : `intent:#Intent;package=${pkg};end`));
+        return reply("Opening " + key + "."), true;
+      }
+    }
+    if ((m = t.match(/\b(?:google|search for|search|look up) (.+)/))) {
+      go("Search: " + m[1], "https://www.google.com/search?q=" + encodeURIComponent(m[1]));
+      return reply("Searching for " + m[1] + "."), true;
+    }
+    if (/\b(hello|hi|hey|how are you|thank)\b/.test(t)) return reply(/thank/.test(t) ? "Anytime, sir." : "At your service, sir."), true;
+    return false;
+  }
+
+  // ---------- one command
+  function norm(s) {
+    return s.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/'/g, "")
+            .replace(/[^a-z0-9% :]+/g, " ").replace(/\s+/g, " ").trim()
+            .replace(/^(hey |ok |okay )?(jarvis|jervis|travis)\b\s*/, "");
+  }
+  function setBusy(b) { busy = b; $("core").classList.toggle("busy", b); }
+  async function run(raw) {
+    raw = (raw || "").trim(); if (!raw || busy) return;
+    setBusy(true); line("u", raw);
+    try {
+      let t = norm(raw), where_ = target;
+      if (/\b(on|from) (my |the )?phone\b/.test(t)) { where_ = "phone"; t = t.replace(/\b(on|from) (my |the )?phone\b/, "").trim(); }
+      else if (/\b(on|from) (my |the )?(laptop|computer|pc)\b/.test(t) && !/\b(play|sound|audio|music|switch)\b/.test(t)) where_ = "laptop";
+      else if (PHONE_ONLY.test(t)) where_ = "phone";
+      if (awaiting) where_ = "laptop";
+
+      if (where_ === "laptop" && laptopOnline) {
+        $("hint").textContent = "LAPTOP…";
+        const r = await api("/api/cmd", { text: raw });
+        awaiting = !!r.awaiting;
+        for (const x of r.replies || []) await reply(x);
+        if (!(r.replies || []).length && !awaiting) line("j", "Done.");
+        refresh();
+        if (awaiting) { setBusy(false); listen(); return; }
+      } else {
+        const done = await phoneLocal(t);
+        if (!done) await reply(where_ === "laptop" ? "The laptop isn't reachable. Is it on and on the same WiFi?" : "I can't do that on the phone. Switch to laptop.");
+      }
+    } catch (e) {
+      awaiting = false;
+      await reply(e.message === "key" ? "This link is old. Say 'phone link' to Jarvis on the laptop and scan the new code." : "I lost the laptop. Try again.");
+      refresh();
+    } finally {
+      setBusy(false); $("hint").innerHTML = "&nbsp;";
+    }
+  }
+
+  // ---------- speech recognition (Chrome)
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let rec = null, listening = false;
+  let nativeText = "";
+  window.jnSpeech = (ev, text) => {
+    if (ev === "start") { listening = true; $("core").classList.add("listen"); $("talk").textContent = awaiting ? "ANSWER…" : "LISTENING"; }
+    else if (ev === "partial") { $("hint").textContent = text.toUpperCase().slice(0, 44); }
+    else {
+      listening = false; $("core").classList.remove("listen"); $("talk").textContent = "TAP TO TALK";
+      if (ev === "final" && text) run(text);
+      else { $("hint").innerHTML = "&nbsp;"; if (awaiting) awaiting = false;
+        if (text === "network") line("j", "No internet for voice. Turn on offline speech: Settings → Google → Voice → Offline speech recognition → English.");
+        if (text === "not-allowed") line("j", "Jarvis needs the microphone. Allow it in the app settings."); }
+    }
+  };
+  function listen() {
+    if (NATIVE) { if (listening) NATIVE.stopListen(); else NATIVE.listen(); return; }
+    if (!SR || !window.isSecureContext) { showSetup(); $("txt").focus(); return; }
+    if (listening) { rec && rec.stop(); return; }
+    speechSynthesis && speechSynthesis.cancel();
+    rec = new SR(); rec.lang = "en-US"; rec.interimResults = true; rec.maxAlternatives = 1; rec.continuous = false;
+    let finalText = "";
+    rec.onstart = () => { listening = true; $("core").classList.add("listen"); $("talk").textContent = awaiting ? "ANSWER…" : "LISTENING"; };
+    rec.onresult = e => {
+      let s = ""; for (const r of e.results) s += r[0].transcript;
+      $("hint").textContent = s.toUpperCase().slice(0, 44);
+      if (e.results[e.results.length - 1].isFinal) finalText = s;
+    };
+    rec.onerror = e => { if (e.error === "not-allowed") showSetup(); };
+    rec.onend = () => {
+      listening = false; $("core").classList.remove("listen"); $("talk").textContent = "TAP TO TALK";
+      if (finalText) run(finalText); else { $("hint").innerHTML = "&nbsp;"; if (awaiting) awaiting = false; }
+    };
+    try { rec.start(); } catch (e) {}
+  }
+  function showSetup() {
+    const el = $("setup"); el.style.display = "block";
+    el.innerHTML = "Voice needs one Chrome setting (once): open <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>, " +
+      "add <code>" + location.origin + "</code>, set it to <b>Enabled</b> and tap <b>Relaunch</b>. Until then, type or use the keyboard mic.";
+  }
+  if (!NATIVE && (!SR || !window.isSecureContext)) showSetup();
+
+  // ---------- wiring
+  $("core").onclick = listen;
+  $("send").onclick = () => { const v = $("txt").value; $("txt").value = ""; run(v); };
+  $("txt").addEventListener("keydown", e => { if (e.key === "Enter") $("send").click(); });
+  document.querySelectorAll(".launch button").forEach(b => b.onclick = () => {
+    const prev = target; target = "laptop"; run(b.dataset.c).finally(() => { target = prev; });
+  });
+  function paintSeg() { document.querySelectorAll("#seg button").forEach(b => b.classList.toggle("on", b.dataset.t === target)); }
+  document.querySelectorAll("#seg button").forEach(b => b.onclick = () => { target = b.dataset.t; localStorage.setItem("kadar_target", target); paintSeg(); });
+  paintSeg();
+  $("linkok").onclick = () => { if (!saveLink($("linkin").value)) line("j", "That doesn't look like the phone link. It should end with ?k=…"); };
+  $("linkbtn").onclick = () => { if (IN_APP) { const c = $("linkcard"); c.style.display = c.style.display === "block" ? "none" : "block"; } };
+  window.jnResume = () => { refresh(); phoneBattery(); };
+  if (IN_APP && !BASE) $("linkcard").style.display = "block";
+  if (!IN_APP && "serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("/sw.js").catch(() => {});
+  if (!navigator.onLine) line("j", "No internet. Time, battery, timers and opening apps still work; voice needs the keyboard mic in offline mode.");
+  if (IN_APP && !BASE) line("j", "Welcome, sir. Paste the laptop link below once, then tap the hologram and talk.");
+  else if (!KEY) line("j", "Open this page from the link or QR code: say 'phone link' to Jarvis on the laptop.");
+  else line("j", "Ready. Tap the hologram and talk.");
+})();
+</script>
+</body>
+</html>

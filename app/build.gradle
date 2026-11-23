@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.mirceticmedia.jarvis'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.mirceticmedia.jarvis'
+        minSdk 26
+        targetSdk 34
+        versionCode Integer.parseInt(System.getenv("BUILD_NUMBER") ?: "1")
+        versionName "1.0." + (System.getenv("BUILD_NUMBER") ?: "1")
+    }
+
+    signingConfigs {
+        // the same key on every build, so updates install over the old app
+        release {
+            storeFile file("jarvis.keystore")
+            storePassword System.getenv("JARVIS_KS_PASS") ?: "jarvis-android"
+            keyAlias "jarvis"
+            keyPassword System.getenv("JARVIS_KS_PASS") ?: "jarvis-android"
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
