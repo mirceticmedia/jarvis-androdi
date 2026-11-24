@@ -383,6 +383,12 @@
       $("np").textContent = s.now_playing ? "♪ " + s.now_playing.toUpperCase() : "";
       $("outl").textContent = (s.output ? "AUDIO / " + s.output.toUpperCase() : "AUDIO / --") + (s.volume != null ? "  VOL " + s.volume : "");
     } catch (e) {
+      // the laptop may have a new address (new WiFi / router): pick up what the phone found, or look for it
+      if (IN_APP && NATIVE && NATIVE.getLink && e.message !== "nolink") {
+        const known = NATIVE.getLink();
+        if (known && known !== BASE) { BASE = known; localStorage.setItem("kadar_base", BASE); return refresh(); }
+        if (NATIVE.findLaptop && !window.__finding) { window.__finding = true; NATIVE.findLaptop(); }
+      }
       laptopOnline = false; $("st").textContent = e.message === "key" ? "WRONG LINK" : e.message === "nolink" ? "NO LINK" : "OFFLINE"; $("st").className = "off";
       if (IN_APP && (e.message === "nolink" || e.message === "key")) $("linkcard").style.display = "block";
       $("hostst").textContent = "OFFLINE";
@@ -667,6 +673,10 @@
   $("linkok").onclick = () => { if (!saveLink($("linkin").value)) line("j", "That doesn't look like the phone link. It should end with ?k=…"); };
   $("linkbtn").onclick = () => { if (IN_APP) { const c = $("linkcard"); c.style.display = c.style.display === "block" ? "none" : "block"; } };
   window.jnResume = () => { refresh(); phoneBattery(); };
+  window.jnFound = base => {
+    setTimeout(() => { window.__finding = false; }, 60000);
+    if (base && base !== BASE) { BASE = base; localStorage.setItem("kadar_base", BASE); line("j", "Found the laptop at its new address."); refresh(); }
+  };
   // "Hey Jarvis" in the background (Android app only)
   function paintBg(on) { const b = $("bgbtn"); b.textContent = on ? "UKLJUČENO" : "ISKLJUČENO"; b.classList.toggle("on", on);
     $("diag").style.display = on && NATIVE && NATIVE.wakeStats ? "block" : "none"; }

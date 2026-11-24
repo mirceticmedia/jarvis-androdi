@@ -472,6 +472,17 @@ public class MainActivity extends Activity {
             } catch (Exception e) { return "I couldn't do that."; }
         }
 
+        /** the laptop address the phone knows now (it may have found a new one) */
+        @JavascriptInterface public String getLink() { return JarvisService.prefs(MainActivity.this).getString("base", ""); }
+
+        /** look for the laptop on this WiFi; answers through jnFound(base or "") */
+        @JavascriptInterface public void findLaptop() {
+            new Thread(() -> {
+                String f = LaptopFinder.find(MainActivity.this);
+                js("window.jnFound && jnFound(" + JSONObject.quote(f == null ? "" : f) + ")");
+            }).start();
+        }
+
         @JavascriptInterface public boolean notifAccess() { return JarvisNotifier.enabled(MainActivity.this); }
 
         @JavascriptInterface public void openNotifAccess() {

@@ -484,7 +484,9 @@ public class JarvisService extends Service {
     // ------------------------------------------------------------------ from the laptop: "find my phone", "export done"
     private void pollLaptop() {
         long last = -1;
+        int fails = 0;
         while (running) {
+            if (fails >= 3) { fails = 0; if (LaptopFinder.find(this) != null) last = -1; }   // laptop got a new address?
             SystemClock.sleep(last < 0 ? 1000 : 6000);
             String base = laptopLink(), key = prefs(this).getString("key", "");
             if (base.isEmpty() || key.isEmpty()) continue;
@@ -494,7 +496,8 @@ public class JarvisService extends Service {
                 c.setConnectTimeout(2500);
                 c.setReadTimeout(5000);
                 c.setRequestProperty("X-Kadar-Key", key);
-                if (c.getResponseCode() != 200) continue;
+                if (c.getResponseCode() != 200) { fails++; continue; }
+                fails = 0;
                 ByteArrayOutputStream out = new ByteArrayOutputStream();
                 try (InputStream is = c.getInputStream()) {
                     byte[] b = new byte[4096];
@@ -513,6 +516,7 @@ public class JarvisService extends Service {
                 }
                 last = newest;
             } catch (Exception ignored) {
+                fails++;
             } finally {
                 if (c != null) c.disconnect();
             }
