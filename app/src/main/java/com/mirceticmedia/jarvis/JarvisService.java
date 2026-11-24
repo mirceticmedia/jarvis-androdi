@@ -355,6 +355,10 @@ public class JarvisService extends Service {
     private boolean handleHere(String said) {
         String t = Phone.norm(said);
         t = t.replaceAll("^(?:hey |ok )?(?:jarvis )?", "");
+        // "what is this?" needs the camera on the screen: open Jarvis with the command
+        if (t.matches("(?:can you )?(?:tell me )?(?:what is this|what ?s this|what is that|what ?s that|what am i holding(?: up)?|what do you see|what can you see|what is in my hand|what ?s in my hand|identify this|scan this|look at this|what is this thing|what ?s this thing|what does this do|how much is (?:this|it) worth|how much is (?:this|it)|what ?s (?:this|it) worth)(?: (?:thing|part|piece|object|component|here|now|right now|called|for|used for|jarvis|sir|please|then))*")) {
+            return false;
+        }
         // flashlight, do not disturb, phone volume
         if (t.matches(".*\\b(flashlight|flash light|torch|lamp)\\b.*")) {
             speak(Actions.torch(this, !t.matches(".*\\b(off|stop|disable)\\b.*")));
@@ -417,7 +421,17 @@ public class JarvisService extends Service {
             JSONObject r = post("/api/cmd", jsonText(text));
             if (r == null) return false;                                 // laptop not reachable: let the app handle it
             JSONArray replies = r.optJSONArray("replies");
-            if (replies != null) for (int k = 0; k < replies.length(); k++) speak(replies.optString(k));
+            if (replies != null) for (int k = 0; k < replies.length(); k++) {
+                String x = replies.optString(k);
+                if (x.startsWith("__SCAN__")) {                        // the laptop wants a picture from the phone camera
+                    Intent i = new Intent(this, MainActivity.class).putExtra("wake", true).putExtra("cmd_status", "text")
+                            .putExtra("cmd", x.contains("value") ? "how much is it worth" : "what is this")
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                    try { startActivity(i); } catch (Exception e) { speak("Open Jarvis on the phone to use the camera."); }
+                    return true;
+                }
+                speak(x);
+            }
             if (!r.optBoolean("awaiting", false)) return true;
             byte[] ans = recordAgain();
             text = ans == null ? "" : transcribe(ans);

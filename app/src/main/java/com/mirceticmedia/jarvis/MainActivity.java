@@ -26,6 +26,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.provider.Settings;
 import android.webkit.GeolocationPermissions;
+import android.webkit.PermissionRequest;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -57,6 +58,8 @@ public class MainActivity extends Activity {
     private GeolocationPermissions.Callback geoCallback;
     private static final int REQ_BG = 13;
     private static final int REQ_CALL = 14;
+    private static final int REQ_CAM = 15;
+    private PermissionRequest camRequest;
     private boolean pageReady = false, wokeByVoice = false;
     private String geoOrigin;
 
@@ -105,6 +108,20 @@ public class MainActivity extends Activity {
             }
         });
         web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onPermissionRequest(final PermissionRequest request) {     // camera for "what is this?"
+                runOnUiThread(() -> {
+                    boolean video = false;
+                    for (String r : request.getResources()) if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r)) video = true;
+                    if (!video) { request.deny(); return; }
+                    if (has(Manifest.permission.CAMERA)) {
+                        request.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                    } else {
+                        camRequest = request;
+                        ask(Manifest.permission.CAMERA, REQ_CAM);
+                    }
+                });
+            }
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
                 if (has(Manifest.permission.ACCESS_COARSE_LOCATION)) {
@@ -284,6 +301,10 @@ public class MainActivity extends Activity {
             else { JarvisService.prefs(this).edit().putBoolean("background", false).apply(); js("window.jnBackground && jnBackground(false)"); }
         } else if (requestCode == REQ_CALL) {
             if (backgroundOn()) askBatteryExemption();
+        } else if (requestCode == REQ_CAM && camRequest != null) {
+            if (ok) camRequest.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+            else camRequest.deny();
+            camRequest = null;
         } else if (requestCode == REQ_LOC && geoCallback != null) {
             geoCallback.invoke(geoOrigin, ok, false);
             geoCallback = null;

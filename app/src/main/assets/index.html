@@ -149,9 +149,28 @@
   footer{display:flex;justify-content:space-between;margin-top:18px;font-family:Mono;font-size:9px;letter-spacing:.12em;color:rgba(0,200,255,.4)}
   .ruler{height:10px;margin-top:10px;background:repeating-linear-gradient(90deg,rgba(0,200,255,.35) 0 1px,transparent 1px 12px);border-bottom:1px solid rgba(0,200,255,.35);position:relative}
   .ruler:after{content:"";position:absolute;left:50%;bottom:-1px;transform:translateX(-50%);border:6px solid transparent;border-bottom-color:var(--or);border-top:0}
+  /* camera scan ("what is this?") */
+  .scan{position:fixed;inset:0;z-index:60;background:#000;display:none;align-items:center;justify-content:center;overflow:hidden}
+  .scan video,.scan img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .scan i{position:absolute;width:56px;height:56px;border:3px solid var(--cy);z-index:2}
+  .scan .c1{top:calc(env(safe-area-inset-top) + 18%);left:12%;border-right:0;border-bottom:0}
+  .scan .c2{top:calc(env(safe-area-inset-top) + 18%);right:12%;border-left:0;border-bottom:0}
+  .scan .c3{bottom:22%;left:12%;border-right:0;border-top:0}
+  .scan .c4{bottom:22%;right:12%;border-left:0;border-top:0}
+  .scan .sweep{position:absolute;left:12%;right:12%;height:2px;background:linear-gradient(90deg,transparent,var(--cy),transparent);
+    box-shadow:0 0 12px var(--cy);z-index:2;animation:sweep 1.6s ease-in-out infinite alternate}
+  @keyframes sweep{from{top:20%}to{top:76%}}
+  .scan.done .sweep{display:none}
+  .scan .sl{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 12%);text-align:center;z-index:2;
+    color:var(--cy);font-size:20px;letter-spacing:3px;text-shadow:0 0 10px #000}
+  .scan .sx{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 6%);text-align:center;z-index:2;
+    color:rgba(232,246,255,.6);font-size:12px;letter-spacing:2px}
 </style>
 </head>
 <body>
+<div class="scan" id="scan"><video id="scanv" playsinline muted autoplay></video><img id="scani" alt="">
+  <i class="c1"></i><i class="c2"></i><i class="c3"></i><i class="c4"></i><div class="sweep"></div>
+  <div class="sl mono" id="scanl">JARVIS // FOCUSING</div><div class="sx mono" id="scanx">TAP TO CANCEL</div></div>
 <div class="frame"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="l"></i><i class="r"></i></div>
 <div class="app">
   <header>
@@ -229,6 +248,8 @@
       <button data-c="take a screenshot">SCREENSHOT<span>10</span></button>
       <button data-c="lock the computer">LOCK<span>11</span></button>
       <button class="d" data-c="shut down computer">SHUT DOWN<span>12</span></button>
+      <button class="w" data-c="what is this">WHAT IS THIS<span>13</span></button>
+      <button class="w" data-c="how much is it worth">HOW MUCH<span>14</span></button>
     </div>
   </div>
 
@@ -337,11 +358,88 @@
       setTimeout(res, 12000);
     });
   }
-  async function reply(text) { line("j", text); await speak(text); }
+  async function reply(text) {
+    if (/^__SCAN__/.test(text)) return phoneScan(text.split(" ")[1] || "what");   // the laptop asks for a picture
+    line("j", text); await speak(text);
+  }
+
+  // ---------- "what is this?" with the PHONE camera (the laptop holds the Gemini key)
+  const SCAN_RE = /^(can you )?(tell me )?(what is this|whats this|what is that|whats that|what am i holding( up)?|what do you see|what can you see|what is in my hand|whats in my hand|what am i showing you|identify this|scan this|look at this|what is this thing|whats this thing|what does this do|what is this for)( (thing|part|piece|object|component|here|right now|now|then))?( called| for| used for)?( (jarvis|sir|please))*$/;
+  const WORTH_RE = /^(and |so |ok |okay )?(how much (is|would) (this|that|it) (be )?(worth|cost|sell for|go for)|how much is (this|that|it)|what (is|would) (this|that|it) (be )?worth|whats (this|that|it) worth|(whats the |what is the )?estimated value|how much does (this|that|it) cost|whats the price|what is the price)( (jarvis|sir|please|then))*$/;
+  let lastScanAt = 0;
+  function shutter() {
+    try {
+      const A = window.AudioContext || window.webkitAudioContext; const ac = new A();
+      const len = Math.floor(ac.sampleRate * 0.12), b = ac.createBuffer(1, len, ac.sampleRate), d = b.getChannelData(0);
+      for (let i = 0; i < len; i++) { const t = i / ac.sampleRate; const env = t < 0.025 ? Math.pow(1 - t / 0.025, 3) : (t > 0.085 ? Math.pow(Math.max(0, 1 - (t - 0.085) / 0.035), 3) * 0.8 : 0); d[i] = (Math.random() * 2 - 1) * env * 0.5; }
+      const src = ac.createBufferSource(); src.buffer = b; src.connect(ac.destination); src.start();
+      setTimeout(() => ac.close(), 400);
+    } catch (e) {}
+    if (navigator.vibrate) navigator.vibrate(30);
+  }
+  function toJpeg(el, w, h) {
+    const k = Math.min(1, 1024 / Math.max(w, h)), c = document.createElement("canvas");
+    c.width = Math.round(w * k); c.height = Math.round(h * k);
+    c.getContext("2d").drawImage(el, 0, 0, c.width, c.height);
+    return c.toDataURL("image/jpeg", 0.85);
+  }
+  function pickPhoto() {                                   // fallback: the phone's own camera app
+    return new Promise((res, rej) => {
+      const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.capture = "environment";
+      inp.onchange = () => {
+        const f = inp.files && inp.files[0]; if (!f) return rej(new Error("cancel"));
+        const im = new Image(); im.onload = () => { res(toJpeg(im, im.naturalWidth, im.naturalHeight)); URL.revokeObjectURL(im.src); };
+        im.onerror = () => rej(new Error("photo")); im.src = URL.createObjectURL(f);
+      };
+      inp.click();
+    });
+  }
+  async function phoneScan(mode) {
+    if (!laptopOnline) return reply("I need the laptop for that, sir. It holds the Gemini key.");
+    const ov = $("scan"), vid = $("scanv"), img = $("scani"), lab = $("scanl");
+    let stream = null, pic = null, cancelled = false;
+    const close = () => { ov.style.display = "none"; ov.classList.remove("done"); img.removeAttribute("src"); vid.srcObject = null; };
+    ov.onclick = () => { cancelled = true; close(); };
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        ov.style.display = "flex"; img.style.display = "none"; vid.style.display = "block";
+        lab.textContent = "JARVIS // FOCUSING"; $("scanx").textContent = "TAP TO CANCEL";
+        stream = await navigator.mediaDevices.getUserMedia({ audio: false,
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
+        vid.srcObject = stream; try { await vid.play(); } catch (e) {}
+        await new Promise(r => setTimeout(r, 1600));          // let focus and exposure settle
+        if (cancelled) throw new Error("cancel");
+        pic = toJpeg(vid, vid.videoWidth || 1280, vid.videoHeight || 720);
+      } else {
+        pic = await pickPhoto();
+      }
+    } catch (e) {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      close();
+      if (cancelled || e.message === "cancel") return reply("Very well.");
+      if (e.name === "NotAllowedError" || e.name === "SecurityError") return reply("I need the camera, sir. Allow it for Jarvis in the app settings.");
+      if (e.name === "NotReadableError") return reply("The camera is busy in another app.");
+      try { pic = await pickPhoto(); } catch (e2) { return reply("I couldn't get a picture."); }
+    }
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    shutter();
+    ov.style.display = "flex"; img.src = pic; img.style.display = "block"; vid.style.display = "none";
+    lab.textContent = mode === "value" ? "JARVIS // VALUING" : "JARVIS // ANALYSING"; $("scanx").textContent = "TAP TO CLOSE";
+    try {
+      const r = await api("/api/vision", { image: pic, mode });
+      lastScanAt = Date.now();
+      ov.classList.add("done"); lab.textContent = "JARVIS // DONE";
+      for (const x of r.replies || []) await reply(x);
+    } catch (e) {
+      await reply(e.message === "key" ? "This link is old. Say 'phone link' to Jarvis on the laptop." : "I lost the laptop while it was thinking. Try again.");
+    } finally {
+      setTimeout(close, 1500);
+    }
+  }
 
   // ---------- laptop link
   async function api(path, body) {
-    const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), body ? 40000 : 6000);
+    const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), path === "/api/vision" ? 75000 : body ? 40000 : 6000);
     try {
       if (IN_APP && !BASE) throw new Error("nolink");
       const r = await fetch(BASE + path, { method: body ? "POST" : "GET", signal: ctl.signal,
@@ -589,6 +687,9 @@
         return;
       }
       let t = norm(raw), where_ = target;
+      if (!awaiting && (SCAN_RE.test(t) || (WORTH_RE.test(t) && Date.now() - lastScanAt > 15 * 60e3))) {
+        await phoneScan(WORTH_RE.test(t) ? "value" : "what"); return;
+      }
       if (/\b(on|from) (my |the )?phone\b/.test(t)) { where_ = "phone"; t = t.replace(/\b(on|from) (my |the )?phone\b/, "").trim(); }
       else if (/\b(on|from) (my |the )?(laptop|computer|pc)\b/.test(t) && !/\b(play|sound|audio|music|switch)\b/.test(t)) where_ = "laptop";
       else if (PHONE_ONLY.test(t)) where_ = "phone";
