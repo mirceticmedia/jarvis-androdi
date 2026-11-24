@@ -9,7 +9,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
+import android.media.AudioAttributes;
 import android.media.AudioFormat;
+import android.media.MediaPlayer;
+import android.media.RingtoneManager;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.media.AudioManager;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
@@ -46,7 +51,7 @@ import java.util.regex.Pattern;
 public class JarvisService extends Service {
     static final String TAG = "JarvisService";
     static final String CH = "jarvis_listen";
-    static final String START = "start", STOP = "stop", PAUSE = "pause", RESUME = "resume";
+    static final String START = "start", STOP = "stop", PAUSE = "pause", RESUME = "resume", STOP_RING = "stop_ring";
     static final Pattern CALL = Pattern.compile("^(?:hey |ok )?(?:jarvis )?(?:please )?(?:call|phone|dial|ring|nazovi|pozovi)(?: to)? (.+)$");
 
     // live numbers for the app's diagnostics line
@@ -62,6 +67,8 @@ public class JarvisService extends Service {
     private Thread loop;
     private TextToSpeech tts;
     private volatile boolean ttsReady = false;
+    private Thread poller;
+    private MediaPlayer ringer;
 
     public static void send(Context ctx, String action) {
         Intent i = new Intent(ctx, JarvisService.class).setAction(action);
@@ -113,6 +120,9 @@ public class JarvisService extends Service {
             case RESUME:
                 paused = false;
                 return START_NOT_STICKY;
+            case STOP_RING:
+                stopRing();
+                return START_NOT_STICKY;
             default:
                 goForeground();
                 paused = false;
@@ -120,6 +130,10 @@ public class JarvisService extends Service {
                     running = true;
                     loop = new Thread(this::listenLoop, "jarvis-wake");
                     loop.start();
+                }
+                if (poller == null) {
+                    poller = new Thread(this::pollLaptop, "jarvis-events");
+                    poller.start();
                 }
                 return START_NOT_STICKY;
         }
@@ -333,9 +347,47 @@ public class JarvisService extends Service {
     private String target() { return prefs(this).getString("target", "laptop"); }
     private String laptopLink() { return prefs(this).getString("base", ""); }
 
-    /** commands done without the screen: calls, and everything for the laptop */
+    private boolean yes(String ans) {
+        return ans != null && Phone.norm(ans).matches("^(yes|yeah|yep|sure|send|send it|do it|ok|okay|go ahead|correct|right|of course|please)\\b.*");
+    }
+
+    /** commands done without the screen: calls, messages, phone settings, and everything for the laptop */
     private boolean handleHere(String said) {
         String t = Phone.norm(said);
+        t = t.replaceAll("^(?:hey |ok )?(?:jarvis )?", "");
+        // flashlight, do not disturb, phone volume
+        if (t.matches(".*\\b(flashlight|flash light|torch|lamp)\\b.*")) {
+            speak(Actions.torch(this, !t.matches(".*\\b(off|stop|disable)\\b.*")));
+            return true;
+        }
+        if (t.matches(".*\\b(do not disturb|dont disturb|silent mode|focus mode on (?:my |the )?phone)\\b.*")) {
+            String r = Actions.dnd(this, !t.matches(".*\\b(off|stop|disable|end)\\b.*"));
+            if (r == null) {
+                speak("I need permission for do not disturb. I'm opening the setting.");
+                try { startActivity(Actions.dndSettings()); } catch (Exception ignored) { }
+            } else speak(r);
+            return true;
+        }
+        if (t.matches(".*\\bvolume\\b.*") && ("phone".equals(target()) || t.matches(".*\\b(phone|telefon)\\b.*"))) {
+            speak(Actions.volume(this, t));
+            return true;
+        }
+        // messages: "text Peca I'm running late" (read back first, then sent only after you say yes)
+        Actions.Draft d = Actions.parse(this, said);
+        if (d != null) {
+            if ("sms".equals(d.app)) {
+                speak("Text " + d.name + ": " + d.message + ". Send it?");
+                byte[] ans = recordAgain();
+                String a = ans == null ? null : transcribe(ans);
+                if (!yes(a)) { speak("Okay, not sent."); return true; }
+                speak(Actions.sendSms(this, d.number, d.message) ? "Sent." : "I couldn't send it. Open Jarvis and allow SMS.");
+            } else {
+                android.content.Intent chat = Actions.chatIntent(d);
+                try { startActivity(chat); speak("It's ready in " + (d.app.equals("whatsapp") ? "WhatsApp" : "Viber") + ". Tap send."); }
+                catch (Exception e) { speak("I couldn't open " + d.app + "."); }
+            }
+            return true;
+        }
         Matcher m = CALL.matcher(t);
         if (m.find()) {
             String who = m.group(1).replaceAll("^(?:my |the )", "").trim();
@@ -429,6 +481,86 @@ public class JarvisService extends Service {
         try { done.await(15, TimeUnit.SECONDS); } catch (InterruptedException ignored) { }
     }
 
+    // ------------------------------------------------------------------ from the laptop: "find my phone", "export done"
+    private void pollLaptop() {
+        long last = -1;
+        while (running) {
+            SystemClock.sleep(last < 0 ? 1000 : 6000);
+            String base = laptopLink(), key = prefs(this).getString("key", "");
+            if (base.isEmpty() || key.isEmpty()) continue;
+            HttpURLConnection c = null;
+            try {
+                c = (HttpURLConnection) new URL(base + "/api/events?since=" + Math.max(0, last)).openConnection();
+                c.setConnectTimeout(2500);
+                c.setReadTimeout(5000);
+                c.setRequestProperty("X-Kadar-Key", key);
+                if (c.getResponseCode() != 200) continue;
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                try (InputStream is = c.getInputStream()) {
+                    byte[] b = new byte[4096];
+                    int n;
+                    while ((n = is.read(b)) > 0) out.write(b, 0, n);
+                }
+                JSONObject r = new JSONObject(out.toString("UTF-8"));
+                long newest = r.optLong("last", 0);
+                if (last < 0 || newest < last) { last = newest; continue; }     // first look (or laptop restarted): skip old news
+                JSONArray evs = r.optJSONArray("events");
+                if (evs != null) for (int k = 0; k < evs.length(); k++) {
+                    JSONObject e = evs.getJSONObject(k);
+                    String kind = e.optString("kind");
+                    if ("ring".equals(kind)) ring();
+                    else if ("say".equals(kind) && Actions.headset(this)) speak(e.optString("text"));
+                }
+                last = newest;
+            } catch (Exception ignored) {
+            } finally {
+                if (c != null) c.disconnect();
+            }
+        }
+    }
+
+    /** loud alarm sound for 40 seconds, even in silent mode; stop it from the notification or by opening Jarvis */
+    private synchronized void ring() {
+        stopRing();
+        try {
+            AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
+            am.setStreamVolume(AudioManager.STREAM_ALARM, am.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0);
+            ringer = new MediaPlayer();
+            ringer.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
+            android.net.Uri u = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+            if (u == null) u = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+            ringer.setDataSource(this, u);
+            ringer.setLooping(true);
+            ringer.prepare();
+            ringer.start();
+            Vibrator v = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+            if (v != null && Build.VERSION.SDK_INT >= 26) v.vibrate(VibrationEffect.createWaveform(new long[]{0, 600, 400}, 0));
+            ringNotice(true);
+            new Thread(() -> { SystemClock.sleep(40000); stopRing(); }).start();
+        } catch (Exception e) {
+            Log.w(TAG, "ring: " + e);
+        }
+    }
+
+    synchronized void stopRing() {
+        try { if (ringer != null) { ringer.stop(); ringer.release(); } } catch (Exception ignored) { }
+        ringer = null;
+        try { Vibrator v = (Vibrator) getSystemService(VIBRATOR_SERVICE); if (v != null) v.cancel(); } catch (Exception ignored) { }
+        ringNotice(false);
+    }
+
+    private void ringNotice(boolean on) {
+        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (!on) { nm.cancel(8); return; }
+        int pf = Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0;
+        PendingIntent stop = PendingIntent.getService(this, 3, new Intent(this, JarvisService.class).setAction(STOP_RING), pf);
+        Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(this, CH) : new Notification.Builder(this);
+        b.setSmallIcon(android.R.drawable.ic_lock_idle_alarm).setContentTitle("Here I am!").setContentText("Tap to stop ringing")
+                .setContentIntent(stop).setAutoCancel(true).addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", stop);
+        nm.notify(8, b.build());
+    }
+
     static boolean canOpenFromBackground(Context c) {
         return Build.VERSION.SDK_INT < 29 || Settings.canDrawOverlays(c);
     }
@@ -437,6 +569,7 @@ public class JarvisService extends Service {
     public void onDestroy() {
         running = false;
         sRunning = false;
+        stopRing();
         if (tts != null) tts.shutdown();
         super.onDestroy();
     }

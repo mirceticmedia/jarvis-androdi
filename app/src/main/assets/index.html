@@ -196,6 +196,8 @@
       <div class="dl"><span>MIKROFON</span><div class="meter"><i id="dLevel"></i></div><b id="dLevelT">--</b></div>
       <div class="dl"><span>"HEY JARVIS"</span><div class="meter"><i id="dScore"></i><em id="dThr"></em></div><b id="dScoreT">--</b></div>
       <div class="dl2"><span id="dStatus">--</span><span>OSETLJIVOST <button id="sMinus">−</button><b id="dSens">--</b><button id="sPlus">+</button></span></div>
+      <div class="dl2"><span>ČITAJ PORUKE I POZIVE U SLUŠALICAMA</span><button id="rnBtn" style="width:auto;padding:0 8px">--</button></div>
+      <button class="xbtn" id="naBtn">DOZVOLI PRISTUP OBAVEŠTENJIMA</button>
       <button class="xbtn" id="xbtn">XIAOMI DOZVOLE (POP-UP, ZAKLJUČAN EKRAN)</button>
     </div>
   </div>
@@ -454,10 +456,26 @@
     if (/half an hour/.test(t) && sec === 0) sec = 1800;
     return sec;
   }
-  const PHONE_ONLY = /\b(alarm|wake me|timer|navigate|directions|take me to|route to|my phone|phone battery|dial)\b|^(call|phone|ring|nazovi|pozovi) /;
+  const PHONE_ONLY = /\b(alarm|wake me|timer|navigate|directions|take me to|route to|my phone|phone battery|dial|flashlight|flash light|torch|do not disturb|dont disturb)\b|^(call|phone|ring|nazovi|pozovi|text|sms|whatsapp|viber|send a message|message) /;
+  let pendingDraft = null;
 
-  async function phoneLocal(t) {
+  async function phoneLocal(t, raw) {
     let m;
+    if (NATIVE && NATIVE.torch && /\b(flashlight|flash light|torch|lamp)\b/.test(t))
+      return reply(NATIVE.torch(!/\b(off|stop|disable)\b/.test(t))), true;
+    if (NATIVE && NATIVE.dnd && /\b(do not disturb|dont disturb|silent mode)\b/.test(t))
+      return reply(NATIVE.dnd(!/\b(off|stop|disable|end)\b/.test(t))), true;
+    if (NATIVE && NATIVE.phoneVolume && /\bvolume\b|\b(louder|quieter)\b/.test(t))
+      return reply(NATIVE.phoneVolume(t)), true;
+    if (NATIVE && NATIVE.draft && /^(send )?(a )?(text|sms|message|whatsapp|viber)\b/.test(t)) {
+      const d = JSON.parse(NATIVE.draft(raw || t));
+      if (d.perm) return reply("Allow contacts and SMS for Jarvis, then say it again."), true;
+      if (!d.name) return reply("Say who and what, for example: text Peca I'm running late."), true;
+      pendingDraft = d;
+      await reply((d.app === "sms" ? "Text " : d.app === "whatsapp" ? "WhatsApp " : "Viber ") + d.name + ": " + d.message + ". Send it?");
+      setTimeout(() => listen(), 200);
+      return true;
+    }
     if (/\b(what time|the time|time is it)\b/.test(t)) {
       return reply("It's " + new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) + "."), true;
     }
@@ -558,6 +576,12 @@
     raw = (raw || "").trim(); if (!raw || busy) return;
     setBusy(true); line("u", raw);
     try {
+      if (pendingDraft) {                                   // the answer to "Send it?"
+        const d = pendingDraft; pendingDraft = null;
+        const ok = /^(yes|yeah|yep|sure|send|ok|okay|go ahead|do it|correct|please)\b/.test(norm(raw));
+        await reply(ok ? NATIVE.sendDraft(JSON.stringify(d)) : "Okay, not sent.");
+        return;
+      }
       let t = norm(raw), where_ = target;
       if (/\b(on|from) (my |the )?phone\b/.test(t)) { where_ = "phone"; t = t.replace(/\b(on|from) (my |the )?phone\b/, "").trim(); }
       else if (/\b(on|from) (my |the )?(laptop|computer|pc)\b/.test(t) && !/\b(play|sound|audio|music|switch)\b/.test(t)) where_ = "laptop";
@@ -573,7 +597,7 @@
         refresh();
         if (awaiting) { setBusy(false); listen(); return; }
       } else {
-        const done = await phoneLocal(t);
+        const done = await phoneLocal(t, raw);
         if (!done) await reply(where_ === "laptop" ? "The laptop isn't reachable. Is it on and on the same WiFi?" : "I can't do that on the phone. Switch to laptop.");
       }
     } catch (e) {
@@ -665,6 +689,16 @@
   if (NATIVE && NATIVE.setThreshold) {
     $("sMinus").onclick = () => { NATIVE.setThreshold(NATIVE.threshold() + 0.05); diag(); };
     $("sPlus").onclick = () => { NATIVE.setThreshold(NATIVE.threshold() - 0.05); diag(); };
+  }
+  function paintNotif() {
+    if (!NATIVE || !NATIVE.readNotifs) return;
+    $("rnBtn").textContent = NATIVE.readNotifs() ? "DA" : "NE";
+    $("naBtn").style.display = NATIVE.notifAccess() ? "none" : "block";
+  }
+  if (NATIVE && NATIVE.readNotifs) {
+    paintNotif(); setInterval(paintNotif, 3000);
+    $("rnBtn").onclick = () => { NATIVE.setReadNotifs(!NATIVE.readNotifs()); paintNotif(); };
+    $("naBtn").onclick = () => NATIVE.openNotifAccess();
   }
   if (NATIVE && NATIVE.isXiaomi && NATIVE.isXiaomi()) { $("xbtn").style.display = "block"; $("xbtn").onclick = () => NATIVE.xiaomiPerms(); }
   if (NATIVE && NATIVE.setTarget) NATIVE.setTarget(target);

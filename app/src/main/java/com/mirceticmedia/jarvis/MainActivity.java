@@ -436,6 +436,52 @@ public class MainActivity extends Activity {
             });
         }
 
+        @JavascriptInterface public String torch(boolean on) { return Actions.torch(MainActivity.this, on); }
+
+        @JavascriptInterface public String phoneVolume(String t) { return Actions.volume(MainActivity.this, t); }
+
+        @JavascriptInterface public String dnd(boolean on) {
+            String r = Actions.dnd(MainActivity.this, on);
+            if (r != null) return r;
+            main.post(() -> { try { startActivity(Actions.dndSettings()); } catch (Exception ignored) { } });
+            return "Allow Do Not Disturb access for Jarvis, then say it again.";
+        }
+
+        /** "text Peca I'm late" -> {"name","number","message","app"} or {} */
+        @JavascriptInterface public String draft(String said) {
+            try {
+                if (!Phone.can(MainActivity.this, Manifest.permission.READ_CONTACTS)) { main.post(MainActivity.this::askCallPerms); return "{\"perm\":true}"; }
+                Actions.Draft d = Actions.parse(MainActivity.this, said);
+                if (d == null) return "{}";
+                return new JSONObject().put("name", d.name).put("number", d.number).put("message", d.message).put("app", d.app).toString();
+            } catch (Exception e) { return "{}"; }
+        }
+
+        @JavascriptInterface public String sendDraft(String json) {
+            try {
+                JSONObject o = new JSONObject(json);
+                Actions.Draft d = new Actions.Draft();
+                d.name = o.getString("name"); d.number = o.getString("number"); d.message = o.getString("message"); d.app = o.getString("app");
+                if ("sms".equals(d.app)) {
+                    if (!Phone.can(MainActivity.this, Manifest.permission.SEND_SMS)) { main.post(MainActivity.this::askCallPerms); return "Allow SMS for Jarvis, then say it again."; }
+                    return Actions.sendSms(MainActivity.this, d.number, d.message) ? "Sent." : "I couldn't send it.";
+                }
+                Intent chat = Actions.chatIntent(d);
+                startActivity(chat);
+                return "It's ready. Tap send.";
+            } catch (Exception e) { return "I couldn't do that."; }
+        }
+
+        @JavascriptInterface public boolean notifAccess() { return JarvisNotifier.enabled(MainActivity.this); }
+
+        @JavascriptInterface public void openNotifAccess() {
+            main.post(() -> { try { startActivity(new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")); } catch (Exception ignored) { } });
+        }
+
+        @JavascriptInterface public boolean readNotifs() { return JarvisService.prefs(MainActivity.this).getBoolean("read_notifs", true); }
+
+        @JavascriptInterface public void setReadNotifs(boolean on) { JarvisService.prefs(MainActivity.this).edit().putBoolean("read_notifs", on).apply(); }
+
         /** call a contact by name: {"ok":bool,"name":..,"msg":..} */
         @JavascriptInterface public String call(String who) {
             try {
@@ -476,7 +522,7 @@ public class MainActivity extends Activity {
 
     private void askCallPerms() {
         if (Build.VERSION.SDK_INT >= 23)
-            requestPermissions(new String[]{Manifest.permission.READ_CONTACTS, Manifest.permission.CALL_PHONE}, REQ_CALL);
+            requestPermissions(new String[]{Manifest.permission.READ_CONTACTS, Manifest.permission.CALL_PHONE, Manifest.permission.SEND_SMS}, REQ_CALL);
     }
 
     private void askBatteryExemption() {
@@ -521,6 +567,7 @@ public class MainActivity extends Activity {
         super.onResume();
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         js("window.jnResume && jnResume()");
+        if (backgroundOn()) JarvisService.send(this, JarvisService.STOP_RING);
         if (backgroundOn() && has(android.Manifest.permission.RECORD_AUDIO)) JarvisService.send(this, JarvisService.START);
     }
 
