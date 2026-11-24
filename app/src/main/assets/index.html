@@ -126,6 +126,19 @@
   .launch button.w{border-left-color:var(--or)} .launch button.d{border-left-color:var(--red);color:#ffb3b3}
   .launch button:active,.row button:active,.seg button:active{background:rgba(0,200,255,.3)}
 
+  .bgbox{display:none;margin:10px 0 0;border:1px solid var(--cyl);background:rgba(0,70,110,.16)}
+  .bgbox .bgrow{display:flex;margin:0;border:0;background:transparent}
+  .diag{display:none;padding:0 10px 9px;font-family:Mono;font-size:9px;letter-spacing:.1em;color:var(--cyd)}
+  .diag .dl{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .diag .dl span{width:84px;flex-shrink:0}
+  .diag .meter{position:relative;flex:1;height:6px;background:rgba(0,200,255,.12)}
+  .diag .meter i{display:block;height:100%;width:0;background:var(--cy);transition:width .15s}
+  .diag .meter em{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--or)}
+  .diag b{width:40px;text-align:right;color:var(--wh);font-weight:400}
+  .diag .dl2{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+  .diag .dl2 button{background:transparent;border:1px solid var(--cyd);color:var(--wh);font-family:Mono;width:26px;height:24px;margin:0 4px}
+  .diag .dl2 b{display:inline-block;width:auto}
+  .diag .xbtn{display:none;width:100%;margin-top:8px;padding:9px;border:1px solid var(--or);background:rgba(255,145,40,.1);color:#ffd2a0;font-family:Orbitron;font-size:9px;letter-spacing:.12em}
   .bgrow{display:none;align-items:center;justify-content:space-between;margin:10px 0 0;padding:8px 10px;border:1px solid var(--cyl);background:rgba(0,70,110,.16)}
   .bgrow span{font-family:Orbitron;font-size:10px;letter-spacing:.16em;color:var(--cy)}
   .bgrow button{font-family:Orbitron;font-size:10px;letter-spacing:.14em;padding:7px 12px;border:1px solid var(--cyd);background:transparent;color:var(--cyd)}
@@ -177,7 +190,15 @@
     <div class="row"><input id="linkin" placeholder="http://192.168.1.100:8765/?k=..." autocomplete="off"><button id="linkok">SAVE</button></div>
   </div>
 
-  <div class="bgrow" id="bgrow"><span>HEY JARVIS // U POZADINI</span><button id="bgbtn">ISKLJUČENO</button></div>
+  <div class="bgbox" id="bgbox">
+    <div class="bgrow" id="bgrow"><span>HEY JARVIS // U POZADINI</span><button id="bgbtn">ISKLJUČENO</button></div>
+    <div class="diag" id="diag">
+      <div class="dl"><span>MIKROFON</span><div class="meter"><i id="dLevel"></i></div><b id="dLevelT">--</b></div>
+      <div class="dl"><span>"HEY JARVIS"</span><div class="meter"><i id="dScore"></i><em id="dThr"></em></div><b id="dScoreT">--</b></div>
+      <div class="dl2"><span id="dStatus">--</span><span>OSETLJIVOST <button id="sMinus">−</button><b id="dSens">--</b><button id="sPlus">+</button></span></div>
+      <button class="xbtn" id="xbtn">XIAOMI DOZVOLE (POP-UP, ZAKLJUČAN EKRAN)</button>
+    </div>
+  </div>
 
   <div class="seg" id="seg"><button data-t="laptop" class="on">LAPTOP</button><button data-t="phone">PHONE</button></div>
 
@@ -433,7 +454,7 @@
     if (/half an hour/.test(t) && sec === 0) sec = 1800;
     return sec;
   }
-  const PHONE_ONLY = /\b(alarm|wake me|timer|navigate|directions|take me to|route to|my phone|phone battery|call \d|dial)\b/;
+  const PHONE_ONLY = /\b(alarm|wake me|timer|navigate|directions|take me to|route to|my phone|phone battery|dial)\b|^(call|phone|ring|nazovi|pozovi) /;
 
   async function phoneLocal(t) {
     let m;
@@ -492,6 +513,11 @@
       if (NATIVE && NATIVE.openApp("com.openai.chatgpt")) return reply("Work mode, sir. Opening ChatGPT."), true;
       go("Open ChatGPT", appIntent("chatgpt.com", "com.openai.chatgpt"));
       return reply("Work mode, sir. Opening ChatGPT."), true;
+    }
+    if ((m = t.match(/^(?:call|phone|dial|ring|nazovi|pozovi) (?:to )?(.+)/)) && !/^[\d ]+$/.test(m[1])) {
+      const who = m[1].replace(/^(my|the) /, "").trim();
+      if (NATIVE && NATIVE.call) { const r = JSON.parse(NATIVE.call(who)); return reply(r.msg), true; }
+      return reply("Calling by name works in the Jarvis app."), true;
     }
     if ((m = t.match(/\bcall ([\d ]{5,})/))) { go("Call", "tel:" + m[1].replace(/ /g, "")); return reply("Calling."), true; }
     if ((m = t.match(/\b(?:search|look up|find) (.+?) on youtube\b/)) || (m = t.match(/\byoutube (?:search )?(?:for )?(.+)/))) {
@@ -611,15 +637,39 @@
     const prev = target; target = "laptop"; run(b.dataset.c).finally(() => { target = prev; });
   });
   function paintSeg() { document.querySelectorAll("#seg button").forEach(b => b.classList.toggle("on", b.dataset.t === target)); }
-  document.querySelectorAll("#seg button").forEach(b => b.onclick = () => { target = b.dataset.t; localStorage.setItem("kadar_target", target); paintSeg(); });
+  document.querySelectorAll("#seg button").forEach(b => b.onclick = () => { target = b.dataset.t; localStorage.setItem("kadar_target", target); paintSeg();
+    if (NATIVE && NATIVE.setTarget) NATIVE.setTarget(target); });
   paintSeg();
   $("linkok").onclick = () => { if (!saveLink($("linkin").value)) line("j", "That doesn't look like the phone link. It should end with ?k=…"); };
   $("linkbtn").onclick = () => { if (IN_APP) { const c = $("linkcard"); c.style.display = c.style.display === "block" ? "none" : "block"; } };
   window.jnResume = () => { refresh(); phoneBattery(); };
   // "Hey Jarvis" in the background (Android app only)
-  function paintBg(on) { const b = $("bgbtn"); b.textContent = on ? "UKLJUČENO" : "ISKLJUČENO"; b.classList.toggle("on", on); }
+  function paintBg(on) { const b = $("bgbtn"); b.textContent = on ? "UKLJUČENO" : "ISKLJUČENO"; b.classList.toggle("on", on);
+    $("diag").style.display = on && NATIVE && NATIVE.wakeStats ? "block" : "none"; }
+  // live check: does the phone hear you, and how close is it to "Hey Jarvis"?
+  const STATUS_SR = { LISTENING: "SLUŠA", PAUSED: "PAUZA (TI PRIČAŠ)", "NO MIC": "NEMA MIKROFONA", "NO MIC PERMISSION": "NEMA DOZVOLE ZA MIKROFON",
+    "MIC LOST": "MIKROFON PREKINUT", "MODEL ERROR": "GREŠKA MODELA", ERROR: "GREŠKA", OFF: "ISKLJUČENO", STARTING: "POKREĆE SE", "HEARD YOU": "ČUO TE!" };
+  function diag() {
+    if (!NATIVE || !NATIVE.wakeStats || $("diag").style.display !== "block" || document.hidden) return;
+    try {
+      const d = JSON.parse(NATIVE.wakeStats()), thr = NATIVE.threshold();
+      const lvl = Math.min(100, Math.round(d.level / 40));
+      $("dLevel").style.width = lvl + "%"; $("dLevelT").textContent = d.mic ? lvl + "%" : "--";
+      $("dScore").style.width = Math.round(d.peak * 100) + "%"; $("dScoreT").textContent = d.peak.toFixed(2);
+      $("dScore").style.background = d.peak >= thr ? "#ff9128" : "";
+      $("dThr").style.left = Math.round(thr * 100) + "%"; $("dSens").textContent = Math.round((1 - thr) * 100) + "%";
+      $("dStatus").textContent = (STATUS_SR[d.status] || d.status) + (d.wakes ? " · " + d.wakes + "×" : "");
+    } catch (e) {}
+  }
+  setInterval(diag, 500);
+  if (NATIVE && NATIVE.setThreshold) {
+    $("sMinus").onclick = () => { NATIVE.setThreshold(NATIVE.threshold() + 0.05); diag(); };
+    $("sPlus").onclick = () => { NATIVE.setThreshold(NATIVE.threshold() - 0.05); diag(); };
+  }
+  if (NATIVE && NATIVE.isXiaomi && NATIVE.isXiaomi()) { $("xbtn").style.display = "block"; $("xbtn").onclick = () => NATIVE.xiaomiPerms(); }
+  if (NATIVE && NATIVE.setTarget) NATIVE.setTarget(target);
   if (NATIVE && NATIVE.setBackground) {
-    $("bgrow").style.display = "flex"; paintBg(NATIVE.backgroundOn());
+    $("bgbox").style.display = "block"; paintBg(NATIVE.backgroundOn());
     $("bgbtn").onclick = () => { const on = !NATIVE.backgroundOn(); NATIVE.setBackground(on); paintBg(on);
       line("j", on ? "Background listening on. Say 'Hey Jarvis' any time." : "Background listening off."); };
   }

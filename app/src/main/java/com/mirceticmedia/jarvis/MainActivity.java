@@ -56,6 +56,7 @@ public class MainActivity extends Activity {
     private boolean micFreed = false;
     private GeolocationPermissions.Callback geoCallback;
     private static final int REQ_BG = 13;
+    private static final int REQ_CALL = 14;
     private boolean pageReady = false, wokeByVoice = false;
     private String geoOrigin;
 
@@ -281,6 +282,8 @@ public class MainActivity extends Activity {
         } else if (requestCode == REQ_BG) {
             if (has(android.Manifest.permission.RECORD_AUDIO)) enableBackground(true);
             else { JarvisService.prefs(this).edit().putBoolean("background", false).apply(); js("window.jnBackground && jnBackground(false)"); }
+        } else if (requestCode == REQ_CALL) {
+            if (backgroundOn()) askBatteryExemption();
         } else if (requestCode == REQ_LOC && geoCallback != null) {
             geoCallback.invoke(geoOrigin, ok, false);
             geoCallback = null;
@@ -396,6 +399,61 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface public boolean backgroundOn() { return MainActivity.this.backgroundOn(); }
 
+        /** live wake word numbers: is it listening, how loud the mic is, best "Hey Jarvis" score */
+        @JavascriptInterface public String wakeStats() { return JarvisService.stats(); }
+
+        @JavascriptInterface public void setTarget(String t) { JarvisService.prefs(MainActivity.this).edit().putString("target", t).apply(); }
+
+        @JavascriptInterface public float threshold() { return JarvisService.threshold(MainActivity.this); }
+
+        @JavascriptInterface public void setThreshold(float t) {
+            JarvisService.prefs(MainActivity.this).edit().putFloat("threshold", Math.max(0.15f, Math.min(0.9f, t))).apply();
+        }
+
+        @JavascriptInterface public boolean isXiaomi() {
+            String m = (Build.MANUFACTURER + " " + Build.BRAND).toLowerCase(java.util.Locale.ROOT);
+            return m.contains("xiaomi") || m.contains("redmi") || m.contains("poco");
+        }
+
+        /** Xiaomi hides "pop up in background" / "show on lock screen" in its own permission screen */
+        @JavascriptInterface public void xiaomiPerms() {
+            main.post(() -> {
+                Intent i = new Intent("miui.intent.action.APP_PERM_EDITOR")
+                        .setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
+                        .putExtra("extra_pkgname", getPackageName());
+                try { startActivity(i); }
+                catch (Exception e) {
+                    try { startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()))); }
+                    catch (Exception ignored) { }
+                }
+            });
+        }
+
+        @JavascriptInterface public void appSettings() {
+            main.post(() -> {
+                try { startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()))); }
+                catch (Exception ignored) { }
+            });
+        }
+
+        /** call a contact by name: {"ok":bool,"name":..,"msg":..} */
+        @JavascriptInterface public String call(String who) {
+            try {
+                JSONObject o = new JSONObject();
+                if (!Phone.can(MainActivity.this, Manifest.permission.READ_CONTACTS)) {
+                    main.post(MainActivity.this::askCallPerms);
+                    return o.put("ok", false).put("msg", "Allow contacts and phone calls, then say it again.").toString();
+                }
+                Phone.Match c = Phone.find(MainActivity.this, who);
+                if (c == null) return o.put("ok", false).put("msg", "I couldn't find " + who + " in your contacts.").toString();
+                if (!Phone.can(MainActivity.this, Manifest.permission.CALL_PHONE)) main.post(MainActivity.this::askCallPerms);
+                boolean ok = Phone.call(MainActivity.this, c.number);
+                return o.put("ok", ok).put("name", c.name).put("msg", ok ? "Calling " + c.name + "." : "Android didn't let me call.").toString();
+            } catch (Exception e) {
+                return "{\"ok\":false,\"msg\":\"Something went wrong.\"}";
+            }
+        }
+
         @JavascriptInterface public void setBackground(boolean on) { main.post(() -> enableBackground(on)); }
 
         /** the page finished a command: the wake word service may listen again */
@@ -416,6 +474,21 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void askCallPerms() {
+        if (Build.VERSION.SDK_INT >= 23)
+            requestPermissions(new String[]{Manifest.permission.READ_CONTACTS, Manifest.permission.CALL_PHONE}, REQ_CALL);
+    }
+
+    private void askBatteryExemption() {
+        try {
+            if (Build.VERSION.SDK_INT >= 23) {
+                android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+                if (!pm.isIgnoringBatteryOptimizations(getPackageName()))
+                    startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName())));
+            }
+        } catch (Exception ignored) { }
+    }
+
     private void enableBackground(boolean on) {
         JarvisService.prefs(this).edit().putBoolean("background", on).apply();
         if (!on) { JarvisService.send(this, JarvisService.STOP); return; }
@@ -433,6 +506,8 @@ public class MainActivity extends Activity {
         }
         JarvisService.send(this, JarvisService.START);
         js("window.jnBackground && jnBackground(true)");
+        if (!Phone.can(this, Manifest.permission.READ_CONTACTS) || !Phone.can(this, Manifest.permission.CALL_PHONE)) askCallPerms();
+        else askBatteryExemption();
     }
 
     @Override
