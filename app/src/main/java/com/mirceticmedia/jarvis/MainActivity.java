@@ -504,7 +504,7 @@ public class MainActivity extends Activity {
             }).start();
         }
 
-        @JavascriptInterface public boolean notifAccess() { return JarvisNotifier.enabled(MainActivity.this); }
+        @JavascriptInterface public boolean notifAccess() { return !BuildConfig.NOTIFIER || JarvisNotifier.enabled(MainActivity.this); }
 
         @JavascriptInterface public void openNotifAccess() {
             main.post(() -> { try { startActivity(new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")); } catch (Exception ignored) { } });

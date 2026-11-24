@@ -25,6 +25,22 @@ android {
             enableV2Signing true
         }
     }
+    buildFeatures {
+        buildConfig true
+    }
+    flavorDimensions "edition"
+    productFlavors {
+        // lite = Jarvis.apk: installs normally (no notification reader, which Play Protect blocks)
+        lite {
+            dimension "edition"
+            buildConfigField "boolean", "NOTIFIER", "false"
+        }
+        // full = Jarvis-full.apk: reads notifications in the headphones (install it with Play Protect scanning paused)
+        full {
+            dimension "edition"
+            buildConfigField "boolean", "NOTIFIER", "true"
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false

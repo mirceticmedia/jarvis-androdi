@@ -91,16 +91,8 @@
             android:name=".JarvisService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
-        <!-- reads incoming calls / messages (needs "Notification access") -->
-        <service
-            android:name=".JarvisNotifier"
-            android:exported="true"
-            android:label="Jarvis"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
+        <!-- the notification reader (.JarvisNotifier) is declared only in the "full" build: src/full/AndroidManifest.xml.
+             Google Play Protect blocks installing APKs that declare it, so the normal Jarvis.apk leaves it out. -->
         <!-- "Jarvis" button in the quick settings -->
         <service
             android:name=".JarvisTile"
